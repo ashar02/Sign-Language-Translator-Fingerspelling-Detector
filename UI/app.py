@@ -373,18 +373,22 @@ def draw_overlays(frame: np.ndarray, stable_char: str,
     Returns:
         Frame with overlays drawn.
     """
+    # Magenta (BGR) for stronger contrast on the camera feed
+    overlay_color = (255, 0, 255)
+    left = 180
+
     # Stable character
-    cv2.putText(frame, f"Stable Character: {stable_char}", (10, 30),
-                cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+    cv2.putText(frame, f"Stable Character: {stable_char}", (left, 50),
+                cv2.FONT_HERSHEY_SIMPLEX, 1, overlay_color, 2)
 
     # Current sentence
-    cv2.putText(frame, f"Sentence: {' '.join(sentence)}", (10, 70),
-                cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+    cv2.putText(frame, f"Sentence: {' '.join(sentence)}", (left, 90),
+                cv2.FONT_HERSHEY_SIMPLEX, 1, overlay_color, 2)
 
     # Stability status
     status_text = "Stable" if is_stable else "Unstable"
-    status_color = (0, 255, 0) if is_stable else (0, 0, 255)
-    cv2.putText(frame, f"Sign Status: {status_text}", (10, 110),
+    status_color = overlay_color if is_stable else (0, 0, 255)
+    cv2.putText(frame, f"Sign Status: {status_text}", (left, 130),
                 cv2.FONT_HERSHEY_SIMPLEX, 1, status_color, 2)
 
     return frame

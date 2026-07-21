@@ -84,8 +84,8 @@ def process_video_with_output():
                     last_confirmed_char = current_char
                     last_detection_time = time.time()
 
-        cv2.putText(frame, f"Stable Character: {stable_char}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-        cv2.putText(frame, f"Sentence: {' '.join(detected_sentence)}", (10, 70), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+        cv2.putText(frame, f"Stable Character: {stable_char}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 255), 2)
+        cv2.putText(frame, f"Sentence: {' '.join(detected_sentence)}", (10, 70), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 255), 2)
 
         cv2.imshow("Sign Language Detection", frame)
 
