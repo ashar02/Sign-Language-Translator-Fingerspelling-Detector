@@ -45,6 +45,9 @@ STABILIZATION_DELAY: float = float(os.getenv('STABILIZATION_DELAY', '2.0'))
 # Input validation
 MAX_TEXT_LENGTH: int = 500
 
+# Server port (used by python app.py; gunicorn uses --bind instead)
+PORT: int = int(os.getenv('PORT', '5000'))
+
 # Paths - resolved relative to this file's directory
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MODEL_PATH = os.path.join(BASE_DIR, '..', 'model', 'model.p')
@@ -670,10 +673,11 @@ signal.signal(signal.SIGTERM, signal_handler)
 if __name__ == '__main__':
     logger.info("Starting Sign Language Translator...")
     logger.info(f"Model path: {MODEL_PATH}")
+    logger.info(f"Port: {PORT}")
     logger.info(f"Stability threshold: {STABILITY_THRESHOLD}")
     logger.info(f"Stabilization delay: {STABILIZATION_DELAY}s")
 
     # Run the Flask app
     # Note: debug=True is for development only
     # For production, use a WSGI server like gunicorn
-    app.run(debug=False, threaded=True)
+    app.run(host='0.0.0.0', port=PORT, debug=False, threaded=True)
