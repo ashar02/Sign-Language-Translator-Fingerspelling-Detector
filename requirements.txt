@@ -9,8 +9,8 @@ flask-limiter==3.5.1
 opencv-contrib-python==4.10.0.84
 mediapipe==0.10.20
 scikit-learn==1.6.0
-numpy==2.2.1
-tensorflow==2.18.0
+numpy==1.26.4
+tensorflow==2.16.2
 
 # Image Processing
 Pillow==11.1.0
