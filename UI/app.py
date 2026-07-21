@@ -25,9 +25,10 @@ load_dotenv()
 
 # Import custom modules
 from functions.text_fix import generate_sentences
-from functions.voice import text_to_speech_and_play
+from functions.voice import text_to_speech
 from functions.text_to_sign import text_to_sign_language
 from functions.speech_to_text import speech_to_text
+import base64
 
 # =============================================================================
 # CONFIGURATION CONSTANTS
@@ -59,6 +60,11 @@ SHOW_HEADER: bool = os.getenv('SHOW_HEADER', 'true').lower() in ('1', 'true', 'y
 SHOW_FOOTER: bool = os.getenv('SHOW_FOOTER', 'true').lower() in ('1', 'true', 'yes', 'on', 'show')
 SHOW_SIGN_TO_TEXT: bool = os.getenv('SHOW_SIGN_TO_TEXT', 'true').lower() in ('1', 'true', 'yes', 'on', 'show')
 SHOW_TEXT_TO_SIGN: bool = os.getenv('SHOW_TEXT_TO_SIGN', 'true').lower() in ('1', 'true', 'yes', 'on', 'show')
+
+# Speak provider: browser (free Web Speech / Google voices) or elevenlabs
+SPEAK_PROVIDER: str = os.getenv('SPEAK_PROVIDER', 'browser').strip().lower()
+if SPEAK_PROVIDER not in ('browser', 'elevenlabs'):
+    SPEAK_PROVIDER = 'browser'
 
 # Paths - resolved relative to this file's directory
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -541,6 +547,7 @@ def index():
         show_sign_to_text=SHOW_SIGN_TO_TEXT,
         show_text_to_sign=SHOW_TEXT_TO_SIGN,
         single_panel=SHOW_SIGN_TO_TEXT ^ SHOW_TEXT_TO_SIGN,
+        speak_provider=SPEAK_PROVIDER,
     )
 
 
@@ -588,26 +595,51 @@ if RATE_LIMITING_ENABLED and limiter:
 
 @app.route('/get_current_prediction')
 def get_current_prediction():
-    """Get the currently stable character prediction."""
-    return jsonify({'prediction': detector.stable_char})
+    """Get live prediction and raw letter stream while recording."""
+    raw_text = ' '.join(detector.detected_sentence) if detector.detected_sentence else ''
+    return jsonify({
+        'prediction': detector.stable_char,
+        'raw_text': raw_text,
+        'is_recording': detector.is_recording,
+    })
 
 
 @app.route('/speak_text', methods=['POST'])
 def speak_text():
-    """Convert the current meaningful sentence to speech."""
+    """Generate TTS audio for browser playback (ElevenLabs provider)."""
     try:
-        if detector.current_meaningful_sentence:
-            text_to_speech_and_play(detector.current_meaningful_sentence)
-            logger.info(f"Spoke text: {detector.current_meaningful_sentence}")
+        if SPEAK_PROVIDER != 'elevenlabs':
             return jsonify({
-                'status': 'success',
-                'message': 'Audio played successfully'
+                'status': 'error',
+                'message': 'Server TTS disabled. SPEAK_PROVIDER is set to browser.'
             })
-        else:
+
+        text = ''
+        if request.is_json and request.json:
+            text = (request.json.get('text') or '').strip()
+        if not text:
+            text = (detector.current_meaningful_sentence or '').strip()
+
+        if not text:
             return jsonify({
                 'status': 'error',
                 'message': 'No text available to speak. Please record some signs first.'
             })
+
+        audio_bytes = text_to_speech(text)
+        if not audio_bytes:
+            return jsonify({
+                'status': 'error',
+                'message': 'Failed to generate audio. Check ELEVENLABS_API_KEY and ELEVENLABS_VOICE_ID in .env.'
+            })
+
+        logger.info(f"Generated TTS for browser playback: {text[:80]}")
+        return jsonify({
+            'status': 'success',
+            'message': 'Audio ready',
+            'audio': base64.b64encode(audio_bytes).decode('ascii'),
+            'mime_type': 'audio/mpeg',
+        })
     except Exception as e:
         logger.error(f"Error in speak_text: {e}")
         return jsonify({

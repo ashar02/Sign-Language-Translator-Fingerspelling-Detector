@@ -221,7 +221,7 @@ async function startRecording() {
                 elements.predictionBox.textContent = '—';
             }
             if (elements.outputBox) {
-                elements.outputBox.textContent = 'Your translated text will appear here...';
+                elements.outputBox.textContent = 'Listening for signs...';
             }
         } else {
             showToast(data.message || 'Failed to start recording', 'error');
@@ -283,7 +283,7 @@ async function stopRecording() {
 }
 
 /**
- * Update the prediction display periodically while recording
+ * Update prediction + live raw text while recording
  */
 function updatePrediction() {
     if (!recording) return;
@@ -297,17 +297,28 @@ function updatePrediction() {
                 predictionBox.classList.add('pulse');
                 setTimeout(() => predictionBox.classList.remove('pulse'), 300);
             }
+
+            const outputBox = elements.outputBox;
+            if (outputBox) {
+                if (data.raw_text) {
+                    outputBox.textContent = data.raw_text;
+                } else if (outputBox.textContent === 'Your translated text will appear here...') {
+                    outputBox.textContent = 'Listening for signs...';
+                }
+            }
         })
         .catch(error => {
             console.error('Error fetching prediction:', error);
         });
 }
 
-// Poll for predictions every second while recording
-setInterval(updatePrediction, 1000);
+// Poll for live letters while recording
+setInterval(updatePrediction, 400);
 
 /**
- * Speak the translated text using text-to-speech
+ * Speak translated text aloud.
+ * Default: free browser Web Speech API (Google voices in Chrome).
+ * Optional: ElevenLabs when SPEAK_PROVIDER=elevenlabs.
  */
 async function speakText() {
     const outputBox = elements.outputBox;
@@ -318,18 +329,62 @@ async function speakText() {
         return;
     }
 
+    const provider = (window.APP_CONFIG && window.APP_CONFIG.speakProvider) || 'browser';
+
     try {
         setButtonLoading('speak-btn');
 
-        const data = await fetchWithErrorHandling('/speak_text', {
-            method: 'POST'
+        if (provider === 'elevenlabs') {
+            const data = await fetchWithErrorHandling('/speak_text', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text })
+            });
+
+            if (data.status === 'success' && data.audio) {
+                const mime = data.mime_type || 'audio/mpeg';
+                const audio = new Audio(`data:${mime};base64,${data.audio}`);
+                await audio.play();
+                showToast('Playing audio', 'success', 2000);
+            } else {
+                showToast(data.message || 'Failed to play audio', 'error');
+            }
+            return;
+        }
+
+        // Free browser TTS (uses system / Google voices in Chrome)
+        if (!window.speechSynthesis) {
+            showToast('Speech is not supported in this browser. Try Chrome.', 'error');
+            return;
+        }
+
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'en-US';
+        utterance.rate = 1;
+        utterance.pitch = 1;
+
+        const pickVoice = () => {
+            const voices = window.speechSynthesis.getVoices();
+            const preferred = voices.find(v => /en(-|_)US/i.test(v.lang) && /google/i.test(v.name))
+                || voices.find(v => /en(-|_)US/i.test(v.lang))
+                || voices.find(v => /^en/i.test(v.lang));
+            if (preferred) utterance.voice = preferred;
+        };
+        pickVoice();
+        if (!utterance.voice) {
+            window.speechSynthesis.onvoiceschanged = () => {
+                pickVoice();
+            };
+        }
+
+        await new Promise((resolve, reject) => {
+            utterance.onend = resolve;
+            utterance.onerror = (event) => reject(new Error(event.error || 'Speech failed'));
+            window.speechSynthesis.speak(utterance);
         });
 
-        if (data.status === 'success') {
-            showToast('Audio played successfully', 'success', 2000);
-        } else {
-            showToast(data.message || 'Failed to play audio', 'error');
-        }
+        showToast('Playing audio', 'success', 2000);
     } catch (error) {
         console.error('Error speaking text:', error);
         showToast(error.message || 'Failed to play audio', 'error');
