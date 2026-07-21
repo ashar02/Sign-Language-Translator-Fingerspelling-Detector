@@ -34,6 +34,7 @@
         </svg>
     </div>
 
+    {% if show_header %}
     <!-- Header -->
     <header class="header">
         <div class="header-content">
@@ -63,6 +64,7 @@
             </nav>
         </div>
     </header>
+    {% endif %}
 
     <!-- Toast notification -->
     <div id="toast" class="toast" role="alert" aria-live="polite" aria-atomic="true">
@@ -282,6 +284,7 @@
         </section>
     </main>
 
+    {% if show_footer %}
     <!-- Footer -->
     <footer class="footer">
         <div class="footer-content">
@@ -289,6 +292,7 @@
             <p class="footer-note">Building bridges, one sign at a time.</p>
         </div>
     </footer>
+    {% endif %}
 
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>

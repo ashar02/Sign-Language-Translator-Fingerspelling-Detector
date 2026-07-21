@@ -48,6 +48,10 @@ MAX_TEXT_LENGTH: int = 500
 # Server port (used by python app.py; gunicorn uses --bind instead)
 PORT: int = int(os.getenv('PORT', '5000'))
 
+# UI visibility (default: show)
+SHOW_HEADER: bool = os.getenv('SHOW_HEADER', 'true').lower() in ('1', 'true', 'yes', 'on', 'show')
+SHOW_FOOTER: bool = os.getenv('SHOW_FOOTER', 'true').lower() in ('1', 'true', 'yes', 'on', 'show')
+
 # Paths - resolved relative to this file's directory
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MODEL_PATH = os.path.join(BASE_DIR, '..', 'model', 'model.p')
@@ -475,7 +479,11 @@ def generate_frames() -> Generator[bytes, None, None]:
 @app.route('/')
 def index():
     """Serve the main page."""
-    return render_template('index.html')
+    return render_template(
+        'index.html',
+        show_header=SHOW_HEADER,
+        show_footer=SHOW_FOOTER,
+    )
 
 
 @app.route('/health')
