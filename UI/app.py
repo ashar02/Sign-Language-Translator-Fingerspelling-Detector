@@ -51,6 +51,8 @@ PORT: int = int(os.getenv('PORT', '5000'))
 # UI visibility (default: show)
 SHOW_HEADER: bool = os.getenv('SHOW_HEADER', 'true').lower() in ('1', 'true', 'yes', 'on', 'show')
 SHOW_FOOTER: bool = os.getenv('SHOW_FOOTER', 'true').lower() in ('1', 'true', 'yes', 'on', 'show')
+SHOW_SIGN_TO_TEXT: bool = os.getenv('SHOW_SIGN_TO_TEXT', 'true').lower() in ('1', 'true', 'yes', 'on', 'show')
+SHOW_TEXT_TO_SIGN: bool = os.getenv('SHOW_TEXT_TO_SIGN', 'true').lower() in ('1', 'true', 'yes', 'on', 'show')
 
 # Paths - resolved relative to this file's directory
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -483,6 +485,9 @@ def index():
         'index.html',
         show_header=SHOW_HEADER,
         show_footer=SHOW_FOOTER,
+        show_sign_to_text=SHOW_SIGN_TO_TEXT,
+        show_text_to_sign=SHOW_TEXT_TO_SIGN,
+        single_panel=SHOW_SIGN_TO_TEXT ^ SHOW_TEXT_TO_SIGN,
     )
 
 

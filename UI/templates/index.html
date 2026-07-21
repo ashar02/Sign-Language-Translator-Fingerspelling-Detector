@@ -101,7 +101,8 @@
         </section>
 
         <!-- Translator Panels -->
-        <div class="translator">
+        <div class="translator{% if single_panel %} translator--single{% endif %}">
+            {% if show_sign_to_text %}
             <!-- Sign to Text Panel -->
             <article class="panel panel-sign-to-text" aria-labelledby="sign-to-text-heading">
                 <header class="panel-header">
@@ -176,7 +177,9 @@
                     </div>
                 </div>
             </article>
+            {% endif %}
 
+            {% if show_sign_to_text and show_text_to_sign %}
             <!-- Divider -->
             <div class="panel-divider">
                 <div class="divider-line"></div>
@@ -187,7 +190,9 @@
                 </div>
                 <div class="divider-line"></div>
             </div>
+            {% endif %}
 
+            {% if show_text_to_sign %}
             <!-- Text to Sign Panel -->
             <article class="panel panel-text-to-sign" aria-labelledby="text-to-sign-heading">
                 <header class="panel-header">
@@ -249,6 +254,7 @@
                     </button>
                 </div>
             </article>
+            {% endif %}
         </div>
 
         <!-- Features Section -->

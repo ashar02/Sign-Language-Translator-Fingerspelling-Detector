@@ -378,6 +378,11 @@ body {
     margin-bottom: var(--space-3xl);
 }
 
+.translator--single {
+    grid-template-columns: minmax(0, 560px);
+    justify-content: center;
+}
+
 .panel {
     background: rgba(255, 255, 255, 0.7);
     backdrop-filter: blur(10px);
@@ -1214,6 +1219,11 @@ body:has(.loading-overlay.active) {
     .translator {
         grid-template-columns: 1fr;
         gap: var(--space-2xl);
+    }
+
+    .translator--single {
+        grid-template-columns: minmax(0, 560px);
+        justify-content: center;
     }
 
     .panel-divider {
