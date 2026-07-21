@@ -11,7 +11,7 @@ services:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "5000:5000"
+      - "${PORT:-5000}:${PORT:-5000}"
     environment:
       - FLASK_ENV=development
       - FLASK_DEBUG=1
@@ -19,16 +19,28 @@ services:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - ELEVENLABS_API_KEY=${ELEVENLABS_API_KEY}
       - ELEVENLABS_VOICE_ID=${ELEVENLABS_VOICE_ID}
+      # Server / traffic
+      - HOST=${HOST:-0.0.0.0}
+      - PORT=${PORT:-5000}
+      - TRAFFIC=${TRAFFIC:-http}
+      - SSL_CERT_FILE=${SSL_CERT_FILE:-}
+      - SSL_KEY_FILE=${SSL_KEY_FILE:-}
       # Configurable settings
       - STABILITY_THRESHOLD=${STABILITY_THRESHOLD:-5}
       - STABILITY_TIME_WINDOW=${STABILITY_TIME_WINDOW:-1.0}
       - STABILIZATION_DELAY=${STABILIZATION_DELAY:-2.0}
       - MIN_DETECTION_CONFIDENCE=${MIN_DETECTION_CONFIDENCE:-0.3}
+      - SHOW_HEADER=${SHOW_HEADER:-true}
+      - SHOW_FOOTER=${SHOW_FOOTER:-true}
+      - SHOW_SIGN_TO_TEXT=${SHOW_SIGN_TO_TEXT:-true}
+      - SHOW_TEXT_TO_SIGN=${SHOW_TEXT_TO_SIGN:-true}
     volumes:
       # Mount source code for development (hot reload)
       - ./UI:/app/UI
       - ./model:/app/model:ro
       - ./datasets:/app/datasets:ro
+      # Optional TLS certs (set SSL_CERT_FILE / SSL_KEY_FILE to paths under certs/)
+      - ./certs:/app/certs:ro
       # Don't mount these to use container's installed packages
       - /app/UI/__pycache__
     devices:
@@ -36,7 +48,7 @@ services:
       - /dev/video0:/dev/video0
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      test: ["CMD-SHELL", "curl -fk http://localhost:$${PORT:-5000}/health || curl -fk https://localhost:$${PORT:-5000}/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3

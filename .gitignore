@@ -2,6 +2,13 @@
 .env
 *.env.local
 
+# TLS certificates / private keys
+certs/
+*.pem
+*.crt
+*.key
+!*.example.pem
+
 # Python
 *.pyc
 *.pyo

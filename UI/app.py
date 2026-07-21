@@ -19,7 +19,8 @@ import logging
 from typing import Optional, Generator, Any
 from dotenv import load_dotenv
 
-# Load environment variables
+# Load environment variables (project root .env, then optional local override)
+load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '.env'))
 load_dotenv()
 
 # Import custom modules
@@ -45,8 +46,13 @@ STABILIZATION_DELAY: float = float(os.getenv('STABILIZATION_DELAY', '2.0'))
 # Input validation
 MAX_TEXT_LENGTH: int = 500
 
-# Server port (used by python app.py; gunicorn uses --bind instead)
+# Server / traffic (python app.py and start.sh / gunicorn)
+HOST: str = os.getenv('HOST', '0.0.0.0')
 PORT: int = int(os.getenv('PORT', '5000'))
+# http (default) or https — https requires SSL_CERT_FILE and SSL_KEY_FILE
+TRAFFIC: str = os.getenv('TRAFFIC', 'http').strip().lower()
+SSL_CERT_FILE: str = os.getenv('SSL_CERT_FILE', '').strip()
+SSL_KEY_FILE: str = os.getenv('SSL_KEY_FILE', '').strip()
 
 # UI visibility (default: show)
 SHOW_HEADER: bool = os.getenv('SHOW_HEADER', 'true').lower() in ('1', 'true', 'yes', 'on', 'show')
@@ -56,8 +62,51 @@ SHOW_TEXT_TO_SIGN: bool = os.getenv('SHOW_TEXT_TO_SIGN', 'true').lower() in ('1'
 
 # Paths - resolved relative to this file's directory
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.abspath(os.path.join(BASE_DIR, '..'))
 MODEL_PATH = os.path.join(BASE_DIR, '..', 'model', 'model.p')
 LOG_FILE = os.path.join(BASE_DIR, 'app.log')
+
+
+def _resolve_path(path: str) -> str:
+    """Resolve a path; relative paths are tried from project root, then CWD."""
+    if not path:
+        return ''
+    if os.path.isabs(path):
+        return path
+    from_root = os.path.join(PROJECT_ROOT, path)
+    if os.path.isfile(from_root):
+        return from_root
+    return os.path.abspath(path)
+
+
+def get_ssl_context() -> Optional[tuple[str, str]]:
+    """Return (cert, key) when HTTPS is enabled; otherwise None.
+
+    TRAFFIC=https requires both SSL_CERT_FILE and SSL_KEY_FILE.
+    If TRAFFIC=http but both cert paths are set and exist, HTTPS is still used.
+    """
+    cert = _resolve_path(SSL_CERT_FILE)
+    key = _resolve_path(SSL_KEY_FILE)
+    want_https = TRAFFIC in ('https', 'ssl', 'tls')
+
+    if want_https:
+        if not SSL_CERT_FILE or not SSL_KEY_FILE:
+            logger.error("TRAFFIC=https requires SSL_CERT_FILE and SSL_KEY_FILE in .env")
+            sys.exit(1)
+        if not os.path.isfile(cert):
+            logger.error(f"SSL certificate not found: {cert}")
+            sys.exit(1)
+        if not os.path.isfile(key):
+            logger.error(f"SSL private key not found: {key}")
+            sys.exit(1)
+        return (cert, key)
+
+    if cert and key and os.path.isfile(cert) and os.path.isfile(key):
+        logger.info("SSL cert/key found; enabling HTTPS even though TRAFFIC is not https")
+        return (cert, key)
+
+    return None
+
 
 # =============================================================================
 # LOGGING CONFIGURATION
@@ -686,11 +735,25 @@ signal.signal(signal.SIGTERM, signal_handler)
 if __name__ == '__main__':
     logger.info("Starting Sign Language Translator...")
     logger.info(f"Model path: {MODEL_PATH}")
+    logger.info(f"Host: {HOST}")
     logger.info(f"Port: {PORT}")
+    logger.info(f"Traffic: {TRAFFIC}")
     logger.info(f"Stability threshold: {STABILITY_THRESHOLD}")
     logger.info(f"Stabilization delay: {STABILIZATION_DELAY}s")
 
+    ssl_context = get_ssl_context()
+    if ssl_context:
+        logger.info(f"HTTPS enabled (cert={ssl_context[0]})")
+    else:
+        logger.info("HTTP enabled (no SSL certs)")
+
     # Run the Flask app
     # Note: debug=True is for development only
-    # For production, use a WSGI server like gunicorn
-    app.run(host='0.0.0.0', port=PORT, debug=False, threaded=True)
+    # For production, use a WSGI server like gunicorn via start.sh
+    app.run(
+        host=HOST,
+        port=PORT,
+        debug=False,
+        threaded=True,
+        ssl_context=ssl_context,
+    )

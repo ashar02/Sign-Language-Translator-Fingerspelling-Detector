@@ -121,36 +121,134 @@ body {
    ANIMATED BACKGROUND
    ============================================================================= */
 
-.bg-gradient {
+.bg-atmosphere {
     position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    overflow: hidden;
+}
+
+.bg-base {
+    position: absolute;
+    inset: 0;
     background:
-        radial-gradient(ellipse 80% 50% at 20% 40%, var(--color-primary-glow), transparent),
-        radial-gradient(ellipse 60% 40% at 80% 60%, var(--color-accent-glow), transparent),
-        radial-gradient(ellipse 100% 80% at 50% 100%, rgba(135, 162, 143, 0.1), transparent);
-    pointer-events: none;
-    z-index: 0;
-    animation: bgBreath 15s ease-in-out infinite;
+        linear-gradient(
+            165deg,
+            #fbf9f6 0%,
+            var(--color-cream) 38%,
+            #f3f0ea 72%,
+            #ebe6de 100%
+        );
 }
 
-@keyframes bgBreath {
+.bg-orbs {
+    position: absolute;
+    inset: -20%;
+    filter: blur(60px);
+    animation: orbFieldDrift 28s ease-in-out infinite alternate;
+}
+
+.orb {
+    position: absolute;
+    border-radius: 50%;
+    will-change: transform, opacity;
+}
+
+.orb-teal {
+    width: min(62vw, 720px);
+    height: min(62vw, 720px);
+    top: 8%;
+    left: -8%;
+    background: radial-gradient(circle at 35% 35%, rgba(42, 122, 122, 0.28), rgba(29, 92, 92, 0.12) 45%, transparent 70%);
+    animation: orbFloatA 22s ease-in-out infinite;
+}
+
+.orb-coral {
+    width: min(48vw, 560px);
+    height: min(48vw, 560px);
+    top: 42%;
+    right: -6%;
+    background: radial-gradient(circle at 40% 40%, rgba(232, 147, 124, 0.32), rgba(224, 122, 95, 0.14) 50%, transparent 72%);
+    animation: orbFloatB 26s ease-in-out infinite;
+}
+
+.orb-sage {
+    width: min(55vw, 640px);
+    height: min(40vw, 480px);
+    bottom: -10%;
+    left: 22%;
+    background: radial-gradient(ellipse at 50% 40%, rgba(135, 162, 143, 0.26), rgba(163, 186, 169, 0.1) 55%, transparent 75%);
+    animation: orbFloatC 24s ease-in-out infinite;
+}
+
+.orb-warm {
+    width: min(36vw, 420px);
+    height: min(36vw, 420px);
+    top: -4%;
+    right: 18%;
+    background: radial-gradient(circle at 50% 50%, rgba(212, 162, 89, 0.18), transparent 68%);
+    animation: orbFloatA 30s ease-in-out infinite reverse;
+}
+
+.bg-mesh {
+    position: absolute;
+    inset: 0;
+    opacity: 0.45;
+    background-image:
+        radial-gradient(circle at 1px 1px, rgba(29, 92, 92, 0.09) 1px, transparent 0);
+    background-size: 28px 28px;
+    mask-image: radial-gradient(ellipse 75% 65% at 50% 40%, black 20%, transparent 75%);
+    -webkit-mask-image: radial-gradient(ellipse 75% 65% at 50% 40%, black 20%, transparent 75%);
+}
+
+.bg-ripple {
+    position: absolute;
+    inset: 0;
+    background:
+        radial-gradient(ellipse 90% 55% at 50% -10%, rgba(255, 255, 255, 0.55), transparent 55%),
+        radial-gradient(ellipse 70% 45% at 85% 85%, rgba(224, 122, 95, 0.08), transparent 60%),
+        radial-gradient(ellipse 60% 50% at 10% 75%, rgba(29, 92, 92, 0.07), transparent 55%);
+    animation: ripplePulse 18s ease-in-out infinite;
+}
+
+.bg-grain {
+    position: absolute;
+    inset: 0;
+    opacity: 0.035;
+    mix-blend-mode: multiply;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+}
+
+.bg-vignette {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse 85% 75% at 50% 45%, transparent 40%, rgba(26, 26, 26, 0.045) 100%);
+}
+
+@keyframes orbFieldDrift {
+    0% { transform: translate(0, 0) rotate(0deg); }
+    100% { transform: translate(2%, -1.5%) rotate(2deg); }
+}
+
+@keyframes orbFloatA {
+    0%, 100% { transform: translate(0, 0) scale(1); opacity: 1; }
+    50% { transform: translate(4%, 6%) scale(1.08); opacity: 0.85; }
+}
+
+@keyframes orbFloatB {
+    0%, 100% { transform: translate(0, 0) scale(1); opacity: 1; }
+    50% { transform: translate(-5%, -4%) scale(1.1); opacity: 0.8; }
+}
+
+@keyframes orbFloatC {
+    0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.95; }
+    50% { transform: translate(3%, -5%) scale(1.06); opacity: 1; }
+}
+
+@keyframes ripplePulse {
     0%, 100% { opacity: 1; transform: scale(1); }
-    50% { opacity: 0.8; transform: scale(1.02); }
-}
-
-.bg-noise {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
-    opacity: 0.02;
-    pointer-events: none;
-    z-index: 0;
+    50% { opacity: 0.75; transform: scale(1.03); }
 }
 
 /* =============================================================================
@@ -159,10 +257,7 @@ body {
 
 .floating-hands {
     position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
+    inset: 0;
     pointer-events: none;
     z-index: 0;
     overflow: hidden;
@@ -170,48 +265,68 @@ body {
 
 .hand {
     position: absolute;
-    color: var(--color-primary);
-    opacity: 0.08;
+    opacity: 0.11;
+    filter: drop-shadow(0 8px 24px rgba(29, 92, 92, 0.08));
 }
 
 .hand-1 {
-    width: 200px;
-    height: 200px;
-    top: 10%;
-    left: 5%;
-    animation: float1 20s ease-in-out infinite;
+    width: 220px;
+    height: 220px;
+    top: 12%;
+    left: 4%;
+    color: var(--color-primary);
+    animation: float1 22s ease-in-out infinite;
 }
 
 .hand-2 {
-    width: 150px;
-    height: 150px;
-    top: 60%;
-    right: 8%;
-    animation: float2 25s ease-in-out infinite;
+    width: 170px;
+    height: 170px;
+    top: 58%;
+    right: 6%;
+    color: var(--color-accent);
+    opacity: 0.13;
+    animation: float2 26s ease-in-out infinite;
 }
 
 .hand-3 {
-    width: 120px;
-    height: 120px;
-    bottom: 15%;
-    left: 15%;
-    animation: float3 18s ease-in-out infinite;
+    width: 140px;
+    height: 140px;
+    bottom: 12%;
+    left: 14%;
+    color: var(--color-secondary);
+    opacity: 0.12;
+    animation: float3 20s ease-in-out infinite;
+}
+
+.hand-4 {
+    width: 160px;
+    height: 160px;
+    top: 28%;
+    right: 14%;
+    color: var(--color-primary-light);
+    opacity: 0.09;
+    animation: float4 24s ease-in-out infinite;
 }
 
 @keyframes float1 {
     0%, 100% { transform: translate(0, 0) rotate(0deg); }
-    33% { transform: translate(20px, -30px) rotate(5deg); }
-    66% { transform: translate(-15px, 20px) rotate(-3deg); }
+    33% { transform: translate(24px, -36px) rotate(6deg); }
+    66% { transform: translate(-18px, 22px) rotate(-4deg); }
 }
 
 @keyframes float2 {
     0%, 100% { transform: translate(0, 0) rotate(0deg); }
-    50% { transform: translate(-25px, -20px) rotate(-8deg); }
+    50% { transform: translate(-28px, -22px) rotate(-9deg); }
 }
 
 @keyframes float3 {
-    0%, 100% { transform: translate(0, 0) scale(1); }
-    50% { transform: translate(15px, -25px) scale(1.05); }
+    0%, 100% { transform: translate(0, 0) scale(1) rotate(0deg); }
+    50% { transform: translate(18px, -28px) scale(1.06) rotate(4deg); }
+}
+
+@keyframes float4 {
+    0%, 100% { transform: translate(0, 0) rotate(-6deg); }
+    50% { transform: translate(-16px, 20px) rotate(4deg); }
 }
 
 /* =============================================================================
@@ -1232,6 +1347,14 @@ body:has(.loading-overlay.active) {
 }
 
 @media (max-width: 768px) {
+    .bg-orbs {
+        filter: blur(40px);
+    }
+
+    .hand-4 {
+        display: none;
+    }
+
     .main {
         padding: var(--space-md);
     }
@@ -1287,9 +1410,14 @@ body:has(.loading-overlay.active) {
         transition-duration: 0.01ms !important;
     }
 
-    .bg-gradient,
+    .bg-orbs,
+    .bg-ripple,
     .floating-hands {
-        display: none;
+        animation: none !important;
+    }
+
+    .bg-orbs .orb {
+        animation: none !important;
     }
 }
 

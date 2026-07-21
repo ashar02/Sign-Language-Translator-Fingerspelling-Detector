@@ -61,10 +61,10 @@ ENV FLASK_APP=app.py
 ENV FLASK_ENV=production
 ENV PYTHONUNBUFFERED=1
 
-# Health check
+# Health check (HTTP by default; override if using HTTPS)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:5000/health || exit 1
+    CMD curl -fk http://localhost:${PORT:-5000}/health || curl -fk https://localhost:${PORT:-5000}/health || exit 1
 
-# Run the application with gunicorn for production
-# Note: For development, use "python app.py" instead
-CMD ["python", "-m", "gunicorn", "--bind", "0.0.0.0:5000", "--workers", "1", "--threads", "2", "app:app"]
+# Run via start.sh so HOST/PORT/TRAFFIC/SSL_* from .env are respected
+RUN chmod +x /app/UI/start.sh
+CMD ["./start.sh"]

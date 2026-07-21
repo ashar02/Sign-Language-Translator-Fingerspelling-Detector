@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="Sign Language Translator - Bridge communication through ASL fingerspelling">
-    <title>SignBridge — ASL Translator</title>
+    <title>ASL Translator</title>
 
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -16,21 +16,41 @@
 </head>
 
 <body>
-    <!-- Animated background -->
-    <div class="bg-gradient"></div>
-    <div class="bg-noise"></div>
+    <!-- Animated atmosphere -->
+    <div class="bg-atmosphere" aria-hidden="true">
+        <div class="bg-base"></div>
+        <div class="bg-orbs">
+            <span class="orb orb-teal"></span>
+            <span class="orb orb-coral"></span>
+            <span class="orb orb-sage"></span>
+            <span class="orb orb-warm"></span>
+        </div>
+        <div class="bg-mesh"></div>
+        <div class="bg-ripple"></div>
+        <div class="bg-grain"></div>
+        <div class="bg-vignette"></div>
+    </div>
 
-    <!-- Floating hand decorations -->
+    <!-- Floating decorative motifs -->
     <div class="floating-hands" aria-hidden="true">
-        <svg class="hand hand-1" viewBox="0 0 100 100" fill="none">
-            <path d="M50 10 C60 20, 70 30, 65 50 C60 70, 40 80, 30 70 C20 60, 25 40, 35 30 C45 20, 45 15, 50 10Z" stroke="currentColor" stroke-width="1.5" fill="none"/>
+        <svg class="hand hand-1" viewBox="0 0 120 120" fill="none">
+            <path d="M60 18c8 6 18 18 16 36-2 18-16 28-26 22-10-6-12-22-6-34 4-8 8-16 16-24z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            <path d="M48 52c-4 8-4 18 2 24M68 48c4 10 2 20-4 26" stroke="currentColor" stroke-width="1.2" opacity="0.5" stroke-linecap="round"/>
+            <circle cx="56" cy="58" r="3" fill="currentColor" opacity="0.35"/>
         </svg>
-        <svg class="hand hand-2" viewBox="0 0 100 100" fill="none">
-            <path d="M30 50 Q50 20 70 50 Q50 80 30 50Z" stroke="currentColor" stroke-width="1.5" fill="none"/>
+        <svg class="hand hand-2" viewBox="0 0 120 120" fill="none">
+            <path d="M40 70c8-28 32-36 40-18 8 18-6 40-24 42-14 2-24-8-16-24z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            <path d="M52 62c4-8 14-12 20-6M58 78c6-4 14-2 16 6" stroke="currentColor" stroke-width="1.2" opacity="0.45" stroke-linecap="round"/>
         </svg>
-        <svg class="hand hand-3" viewBox="0 0 100 100" fill="none">
-            <circle cx="50" cy="50" r="30" stroke="currentColor" stroke-width="1.5" fill="none"/>
-            <circle cx="50" cy="50" r="15" stroke="currentColor" stroke-width="1" fill="none" opacity="0.5"/>
+        <svg class="hand hand-3" viewBox="0 0 120 120" fill="none">
+            <circle cx="60" cy="60" r="34" stroke="currentColor" stroke-width="1.4"/>
+            <circle cx="60" cy="60" r="20" stroke="currentColor" stroke-width="1" opacity="0.45"/>
+            <circle cx="60" cy="60" r="8" stroke="currentColor" stroke-width="1" opacity="0.3"/>
+            <path d="M60 26v10M60 84v10M26 60h10M84 60h10" stroke="currentColor" stroke-width="1.2" opacity="0.4" stroke-linecap="round"/>
+        </svg>
+        <svg class="hand hand-4" viewBox="0 0 120 120" fill="none">
+            <path d="M30 78c12-8 22-28 28-44 4-10 18-8 20 2 2 12-4 28-14 38-10 10-24 14-34 4z" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+            <path d="M48 48c2 10 0 22-6 30" stroke="currentColor" stroke-width="1.1" opacity="0.4" stroke-linecap="round"/>
         </svg>
     </div>
 
