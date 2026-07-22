@@ -140,10 +140,24 @@
 
                 <div class="camera-container">
                     <div class="camera-frame">
+                        {% if camera_source == 'server' %}
                         <img src="{{ url_for('video_feed') }}"
                              alt="Live camera feed showing hand gesture detection"
                              id="camera-feed"
                              class="camera-feed">
+                        {% else %}
+                        <video id="camera-video"
+                               class="camera-feed camera-video"
+                               playsinline
+                               muted
+                               autoplay></video>
+                        <img id="camera-annotated"
+                             class="camera-feed camera-annotated"
+                             alt="Annotated hand detection"
+                             hidden>
+                        <canvas id="camera-capture" class="camera-capture" hidden></canvas>
+                        <div id="camera-status" class="camera-status">Starting camera…</div>
+                        {% endif %}
                         <div class="camera-overlay">
                             <div class="camera-corners">
                                 <span></span><span></span><span></span><span></span>
@@ -322,7 +336,8 @@
 
     <script>
         window.APP_CONFIG = {
-            speakProvider: {{ speak_provider|tojson }}
+            speakProvider: {{ speak_provider|tojson }},
+            cameraSource: {{ camera_source|tojson }}
         };
     </script>
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>

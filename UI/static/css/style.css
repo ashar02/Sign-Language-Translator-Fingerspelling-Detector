@@ -626,6 +626,37 @@ body {
     object-fit: cover;
 }
 
+.camera-video {
+    transform: scaleX(-1);
+    background: #0d0d0d;
+}
+
+.camera-annotated {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    transform: scaleX(-1);
+}
+
+.camera-status {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-lg);
+    text-align: center;
+    color: #fff;
+    background: rgba(0, 0, 0, 0.55);
+    font-family: var(--font-body);
+    font-size: 0.95rem;
+}
+
+.camera-status.is-hidden {
+    display: none;
+}
+
 .camera-overlay {
     position: absolute;
     inset: 0;

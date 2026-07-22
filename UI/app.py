@@ -16,6 +16,8 @@ import sys
 import signal
 import atexit
 import logging
+import base64
+import threading
 from typing import Optional, Generator, Any
 from dotenv import load_dotenv
 
@@ -28,7 +30,7 @@ from functions.text_fix import generate_sentences
 from functions.voice import text_to_speech
 from functions.text_to_sign import text_to_sign_language
 from functions.speech_to_text import speech_to_text
-import base64
+# base64 already imported above
 
 # =============================================================================
 # CONFIGURATION CONSTANTS
@@ -65,6 +67,11 @@ SHOW_TEXT_TO_SIGN: bool = os.getenv('SHOW_TEXT_TO_SIGN', 'true').lower() in ('1'
 SPEAK_PROVIDER: str = os.getenv('SPEAK_PROVIDER', 'browser').strip().lower()
 if SPEAK_PROVIDER not in ('browser', 'elevenlabs'):
     SPEAK_PROVIDER = 'browser'
+
+# Camera source: browser (client webcam) or server (OpenCV /dev/video0)
+CAMERA_SOURCE: str = os.getenv('CAMERA_SOURCE', 'browser').strip().lower()
+if CAMERA_SOURCE not in ('browser', 'server'):
+    CAMERA_SOURCE = 'browser'
 
 # Paths - resolved relative to this file's directory
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -203,6 +210,56 @@ def initialize_mediapipe() -> mp.solutions.hands.Hands:
 model = load_model()
 mp_hands = mp.solutions.hands
 hands = initialize_mediapipe()
+hands_lock = threading.Lock()
+
+
+def process_detection_frame(frame: np.ndarray) -> tuple[np.ndarray, dict]:
+    """Run hand detection + prediction on a BGR frame.
+
+    Args:
+        frame: OpenCV BGR image.
+
+    Returns:
+        Tuple of (annotated_frame, result_dict).
+    """
+    frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    with hands_lock:
+        results = hands.process(frame_rgb)
+
+    predicted_char = ''
+    confidence = 0.0
+
+    if results.multi_hand_landmarks:
+        for hand_landmarks in results.multi_hand_landmarks:
+            mp.solutions.drawing_utils.draw_landmarks(
+                frame, hand_landmarks, mp_hands.HAND_CONNECTIONS
+            )
+            features = process_hand_landmarks(hand_landmarks)
+            if len(features) == FEATURE_VECTOR_SIZE:
+                predicted_char, confidence = predict_character(features)
+                is_stable, stable_pred = detector.check_sign_stability(predicted_char)
+                if is_stable and stable_pred:
+                    detector.process_stable_prediction(stable_pred)
+            break
+
+    is_buffer_stable = len(detector.stability_buffer) >= STABILITY_THRESHOLD
+    if predicted_char or detector.stable_char or detector.detected_sentence:
+        frame = draw_overlays(
+            frame,
+            detector.stable_char or predicted_char,
+            detector.detected_sentence,
+            is_buffer_stable,
+        )
+
+    return frame, {
+        'prediction': detector.stable_char or predicted_char,
+        'current_prediction': predicted_char,
+        'confidence': round(float(confidence), 1),
+        'raw_text': ' '.join(detector.detected_sentence) if detector.detected_sentence else '',
+        'is_stable': is_buffer_stable,
+        'is_recording': detector.is_recording,
+        'hand_detected': bool(results.multi_hand_landmarks),
+    }
 
 # Label mapping: 0-25 -> a-z
 labels_dict = {i: chr(97 + i) for i in range(26)}
@@ -475,39 +532,7 @@ def generate_frames() -> Generator[bytes, None, None]:
                 # Reset failure counter on successful read
                 consecutive_failures = 0
 
-                # Convert to RGB for MediaPipe
-                frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                results = hands.process(frame_rgb)
-
-                # Process detected hands
-                if results.multi_hand_landmarks:
-                    for hand_landmarks in results.multi_hand_landmarks:
-                        # Draw hand landmarks
-                        mp.solutions.drawing_utils.draw_landmarks(
-                            frame, hand_landmarks, mp_hands.HAND_CONNECTIONS
-                        )
-
-                        # Extract features and predict
-                        features = process_hand_landmarks(hand_landmarks)
-
-                        if len(features) == FEATURE_VECTOR_SIZE:
-                            predicted_char, confidence = predict_character(features)
-
-                            # Check stability
-                            is_stable, stable_pred = detector.check_sign_stability(predicted_char)
-
-                            if is_stable and stable_pred:
-                                detector.process_stable_prediction(stable_pred)
-
-                            # Draw overlays
-                            is_buffer_stable = len(detector.stability_buffer) >= STABILITY_THRESHOLD
-                            frame = draw_overlays(
-                                frame,
-                                detector.stable_char,
-                                detector.detected_sentence,
-                                is_buffer_stable
-                            )
-                            break  # Only process first detected hand
+                frame, _ = process_detection_frame(frame)
 
                 # Encode and yield frame
                 ret, buffer = cv2.imencode('.jpg', frame)
@@ -548,6 +573,7 @@ def index():
         show_text_to_sign=SHOW_TEXT_TO_SIGN,
         single_panel=SHOW_SIGN_TO_TEXT ^ SHOW_TEXT_TO_SIGN,
         speak_provider=SPEAK_PROVIDER,
+        camera_source=CAMERA_SOURCE,
     )
 
 
@@ -568,6 +594,45 @@ def video_feed():
         generate_frames(),
         mimetype='multipart/x-mixed-replace; boundary=frame'
     )
+
+
+@app.route('/predict_frame', methods=['POST'])
+def predict_frame():
+    """Accept a browser webcam frame and return detection results + annotated image."""
+    try:
+        image_bytes = None
+
+        if request.files.get('frame'):
+            image_bytes = request.files['frame'].read()
+        elif request.is_json and request.json:
+            data_url = request.json.get('image', '')
+            if ',' in data_url:
+                data_url = data_url.split(',', 1)[1]
+            if data_url:
+                image_bytes = base64.b64decode(data_url)
+
+        if not image_bytes:
+            return jsonify({'status': 'error', 'message': 'No frame provided'}), 400
+
+        np_arr = np.frombuffer(image_bytes, dtype=np.uint8)
+        frame = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+        if frame is None:
+            return jsonify({'status': 'error', 'message': 'Invalid image data'}), 400
+
+        annotated, result = process_detection_frame(frame)
+
+        ok, buffer = cv2.imencode('.jpg', annotated, [int(cv2.IMWRITE_JPEG_QUALITY), 75])
+        if not ok:
+            return jsonify({'status': 'error', 'message': 'Failed to encode frame'}), 500
+
+        result.update({
+            'status': 'success',
+            'annotated_image': 'data:image/jpeg;base64,' + base64.b64encode(buffer).decode('ascii'),
+        })
+        return jsonify(result)
+    except Exception as e:
+        logger.error(f"Error in predict_frame: {e}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
 
 
 @app.route('/start_recording', methods=['POST'])
@@ -774,6 +839,8 @@ if __name__ == '__main__':
     logger.info(f"Host: {HOST}")
     logger.info(f"Port: {PORT}")
     logger.info(f"Traffic: {TRAFFIC}")
+    logger.info(f"Camera source: {CAMERA_SOURCE}")
+    logger.info(f"Speak provider: {SPEAK_PROVIDER}")
     logger.info(f"Stability threshold: {STABILITY_THRESHOLD}")
     logger.info(f"Stabilization delay: {STABILIZATION_DELAY}s")
 

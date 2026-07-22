@@ -283,36 +283,45 @@ async function stopRecording() {
 }
 
 /**
- * Update prediction + live raw text while recording
+ * Update prediction + live raw text while recording (server-camera fallback poll)
  */
 function updatePrediction() {
     if (!recording) return;
+    if (getCameraSource() === 'browser') return; // browser mode updates via /predict_frame
 
     fetch('/get_current_prediction')
         .then(response => response.json())
         .then(data => {
-            const predictionBox = elements.predictionBox;
-            if (predictionBox && data.prediction) {
-                predictionBox.textContent = data.prediction;
-                predictionBox.classList.add('pulse');
-                setTimeout(() => predictionBox.classList.remove('pulse'), 300);
-            }
-
-            const outputBox = elements.outputBox;
-            if (outputBox) {
-                if (data.raw_text) {
-                    outputBox.textContent = data.raw_text;
-                } else if (outputBox.textContent === 'Your translated text will appear here...') {
-                    outputBox.textContent = 'Listening for signs...';
-                }
-            }
+            applyPredictionUi(data);
         })
         .catch(error => {
             console.error('Error fetching prediction:', error);
         });
 }
 
-// Poll for live letters while recording
+function applyPredictionUi(data) {
+    const predictionBox = elements.predictionBox;
+    const pred = data.prediction || data.current_prediction;
+    if (predictionBox && pred) {
+        predictionBox.textContent = pred;
+        predictionBox.classList.add('pulse');
+        setTimeout(() => predictionBox.classList.remove('pulse'), 300);
+    }
+
+    const outputBox = elements.outputBox;
+    if (outputBox && recording) {
+        if (data.raw_text) {
+            outputBox.textContent = data.raw_text;
+        } else if (
+            outputBox.textContent === 'Your translated text will appear here...' ||
+            outputBox.textContent === 'Listening for signs...'
+        ) {
+            outputBox.textContent = 'Listening for signs...';
+        }
+    }
+}
+
+// Poll for live letters while recording (server camera mode only)
 setInterval(updatePrediction, 400);
 
 /**
@@ -671,52 +680,187 @@ function announceToScreenReader(message) {
 }
 
 // =============================================================================
-// VIDEO FEED MANAGEMENT
+// VIDEO / CAMERA MANAGEMENT
 // =============================================================================
 
 let videoFeedRetryCount = 0;
 const MAX_VIDEO_RETRIES = 10;
 const VIDEO_RETRY_DELAY = 3000;
 let videoFeedCheckInterval = null;
+let browserStream = null;
+let browserPredictTimer = null;
+let browserPredictInFlight = false;
+const BROWSER_PREDICT_INTERVAL_MS = 180;
+
+function getCameraSource() {
+    return (window.APP_CONFIG && window.APP_CONFIG.cameraSource) || 'browser';
+}
+
+function setCameraStatus(message, hide = false) {
+    const status = document.getElementById('camera-status');
+    if (!status) return;
+    if (hide) {
+        status.classList.add('is-hidden');
+        status.textContent = '';
+        return;
+    }
+    status.classList.remove('is-hidden');
+    status.textContent = message;
+}
 
 /**
- * Initialize video feed with error handling and auto-reconnect
+ * Initialize camera (browser webcam or server MJPEG)
  */
 function initializeVideoFeed() {
+    if (getCameraSource() === 'browser') {
+        initializeBrowserCamera();
+        return;
+    }
+
     const cameraFeed = document.getElementById('camera-feed');
     if (!cameraFeed) return;
 
-    // Set initial source
     refreshVideoFeed();
-
-    // Handle image load errors
     cameraFeed.onerror = function() {
         console.error('Video feed error, attempting reconnect...');
         handleVideoFeedError();
     };
-
-    // Check if video feed is stale (no updates)
     startVideoFeedMonitor();
 }
 
 /**
- * Refresh the video feed by resetting the src
+ * Use the visitor's webcam and send frames to the server for inference
+ */
+async function initializeBrowserCamera() {
+    const video = document.getElementById('camera-video');
+    if (!video) return;
+
+    if (!window.isSecureContext && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+        setCameraStatus('Camera requires HTTPS (or localhost). Set TRAFFIC=https with SSL certs, then reload.');
+        showToast('Browser camera needs HTTPS on remote hosts', 'error', 8000);
+        return;
+    }
+
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        setCameraStatus('Camera API not supported in this browser. Try Chrome.');
+        return;
+    }
+
+    try {
+        setCameraStatus('Requesting camera permission…');
+        browserStream = await navigator.mediaDevices.getUserMedia({
+            video: {
+                facingMode: 'user',
+                width: { ideal: 640 },
+                height: { ideal: 480 }
+            },
+            audio: false
+        });
+        video.srcObject = browserStream;
+        await video.play();
+        setCameraStatus('', true);
+        startBrowserPredictionLoop();
+        showToast('Camera connected', 'success', 2000);
+    } catch (error) {
+        console.error('Browser camera error:', error);
+        const msg = error.name === 'NotAllowedError'
+            ? 'Camera permission denied. Allow camera access and refresh.'
+            : `Could not open camera: ${error.message || error.name}`;
+        setCameraStatus(msg);
+        showToast(msg, 'error', 6000);
+    }
+}
+
+function startBrowserPredictionLoop() {
+    stopBrowserPredictionLoop();
+    browserPredictTimer = setInterval(sendBrowserFrameForPrediction, BROWSER_PREDICT_INTERVAL_MS);
+}
+
+function stopBrowserPredictionLoop() {
+    if (browserPredictTimer) {
+        clearInterval(browserPredictTimer);
+        browserPredictTimer = null;
+    }
+}
+
+async function sendBrowserFrameForPrediction() {
+    if (browserPredictInFlight) return;
+
+    const video = document.getElementById('camera-video');
+    const canvas = document.getElementById('camera-capture');
+    if (!video || !canvas || video.readyState < 2) return;
+
+    browserPredictInFlight = true;
+    try {
+        const maxWidth = 480;
+        const scale = Math.min(1, maxWidth / video.videoWidth);
+        const width = Math.max(1, Math.round(video.videoWidth * scale));
+        const height = Math.max(1, Math.round(video.videoHeight * scale));
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(video, 0, 0, width, height);
+
+        const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.7));
+        if (!blob) return;
+
+        const formData = new FormData();
+        formData.append('frame', blob, 'frame.jpg');
+
+        const response = await fetch('/predict_frame', { method: 'POST', body: formData });
+        const data = await response.json();
+        if (!response.ok || data.status === 'error') {
+            throw new Error(data.message || 'Prediction failed');
+        }
+
+        const annotated = document.getElementById('camera-annotated');
+        if (annotated && data.annotated_image) {
+            annotated.src = data.annotated_image;
+            annotated.hidden = false;
+        }
+
+        applyPredictionUi(data);
+    } catch (error) {
+        // Keep camera preview even if a single prediction fails
+        console.warn('Frame prediction error:', error.message || error);
+    } finally {
+        browserPredictInFlight = false;
+    }
+}
+
+/**
+ * Refresh the camera feed
  */
 function refreshVideoFeed() {
+    if (getCameraSource() === 'browser') {
+        stopBrowserPredictionLoop();
+        if (browserStream) {
+            browserStream.getTracks().forEach(track => track.stop());
+            browserStream = null;
+        }
+        const annotated = document.getElementById('camera-annotated');
+        if (annotated) {
+            annotated.hidden = true;
+            annotated.removeAttribute('src');
+        }
+        initializeBrowserCamera();
+        return;
+    }
+
     const cameraFeed = document.getElementById('camera-feed');
     if (!cameraFeed) return;
 
-    // Add timestamp to force reload
     const timestamp = new Date().getTime();
-    const baseUrl = '/video_feed';
-    cameraFeed.src = `${baseUrl}?t=${timestamp}`;
+    cameraFeed.src = `/video_feed?t=${timestamp}`;
     console.log('Video feed refreshed');
 }
 
 /**
- * Handle video feed errors with retry logic
+ * Handle video feed errors with retry logic (server mode)
  */
 function handleVideoFeedError() {
+    if (getCameraSource() === 'browser') return;
+
     videoFeedRetryCount++;
 
     if (videoFeedRetryCount <= MAX_VIDEO_RETRIES) {
@@ -733,43 +877,44 @@ function handleVideoFeedError() {
 }
 
 /**
- * Monitor video feed for stale frames
+ * Monitor video feed for stale frames (server mode)
  */
 function startVideoFeedMonitor() {
     const cameraFeed = document.getElementById('camera-feed');
-    if (!cameraFeed) return;
+    if (!cameraFeed || getCameraSource() === 'browser') return;
 
     let lastLoadTime = Date.now();
 
-    // Track successful loads
     cameraFeed.onload = function() {
         lastLoadTime = Date.now();
-        videoFeedRetryCount = 0; // Reset retry count on successful load
+        videoFeedRetryCount = 0;
     };
 
-    // Periodically check if feed is stale (no load events for 10 seconds)
     if (videoFeedCheckInterval) {
         clearInterval(videoFeedCheckInterval);
     }
 
     videoFeedCheckInterval = setInterval(() => {
-        const timeSinceLastLoad = Date.now() - lastLoadTime;
-
-        // If no load event for 10 seconds and we're not already retrying
-        if (timeSinceLastLoad > 10000 && videoFeedRetryCount === 0) {
+        if (Date.now() - lastLoadTime > 10000) {
             console.warn('Video feed appears stale, refreshing...');
             refreshVideoFeed();
+            lastLoadTime = Date.now();
         }
     }, 5000);
 }
 
 /**
- * Clean up video feed monitoring
+ * Clean up video feed monitoring / browser camera
  */
 function cleanupVideoFeed() {
     if (videoFeedCheckInterval) {
         clearInterval(videoFeedCheckInterval);
         videoFeedCheckInterval = null;
+    }
+    stopBrowserPredictionLoop();
+    if (browserStream) {
+        browserStream.getTracks().forEach(track => track.stop());
+        browserStream = null;
     }
 }
 
