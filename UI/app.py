@@ -73,6 +73,11 @@ CAMERA_SOURCE: str = os.getenv('CAMERA_SOURCE', 'browser').strip().lower()
 if CAMERA_SOURCE not in ('browser', 'server'):
     CAMERA_SOURCE = 'browser'
 
+# Inference location for browser camera: client (fast) or server (frame upload)
+INFERENCE_MODE: str = os.getenv('INFERENCE_MODE', 'client').strip().lower()
+if INFERENCE_MODE not in ('client', 'server'):
+    INFERENCE_MODE = 'client'
+
 # Paths - resolved relative to this file's directory
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.abspath(os.path.join(BASE_DIR, '..'))
@@ -369,6 +374,33 @@ class SignLanguageDetector:
             logger.debug(f"Added character: {prediction}, Sentence: {self.detected_sentence}")
 
 
+    def append_confirmed_character(self, prediction: str) -> None:
+        """Append a client-confirmed character while recording."""
+        if not self.is_recording or not prediction:
+            return
+        char = prediction.strip().upper()
+        if len(char) != 1 or not char.isalpha():
+            return
+        self.stable_char = char
+        if char != self.last_confirmed_char:
+            self.detected_sentence.append(char)
+            self.last_confirmed_char = char
+            self.last_detection_time = time.time()
+            logger.debug(f"Client appended character: {char}, Sentence: {self.detected_sentence}")
+
+    def replace_detected_sentence(self, letters: list[str]) -> None:
+        """Replace detected sentence from client-side inference letters."""
+        cleaned = []
+        for item in letters or []:
+            ch = str(item).strip().upper()
+            if len(ch) == 1 and ch.isalpha():
+                cleaned.append(ch)
+        self.detected_sentence = cleaned
+        if cleaned:
+            self.stable_char = cleaned[-1]
+            self.last_confirmed_char = cleaned[-1]
+
+
 # Create global detector instance
 detector = SignLanguageDetector()
 
@@ -574,6 +606,10 @@ def index():
         single_panel=SHOW_SIGN_TO_TEXT ^ SHOW_TEXT_TO_SIGN,
         speak_provider=SPEAK_PROVIDER,
         camera_source=CAMERA_SOURCE,
+        inference_mode=INFERENCE_MODE,
+        stability_threshold=STABILITY_THRESHOLD,
+        stability_time_window=STABILITY_TIME_WINDOW,
+        stabilization_delay=STABILIZATION_DELAY,
     )
 
 
@@ -645,11 +681,31 @@ def start_recording():
 @app.route('/stop_recording', methods=['POST'])
 def stop_recording_route():
     """Stop recording and process the detected sentence."""
+    # Client inference may send the final letter list explicitly
+    if request.is_json and request.json:
+        letters = request.json.get('letters')
+        if isinstance(letters, list):
+            detector.replace_detected_sentence(letters)
+
     raw_text, meaningful_sentence = detector.stop_recording()
     return jsonify({
         'status': 'success',
         'raw_text': raw_text,
         'meaningful_sentence': meaningful_sentence
+    })
+
+
+@app.route('/append_character', methods=['POST'])
+def append_character():
+    """Append a character confirmed by client-side inference."""
+    if not request.is_json or not request.json:
+        return jsonify({'status': 'error', 'message': 'JSON required'}), 400
+    char = (request.json.get('character') or '').strip()
+    detector.append_confirmed_character(char)
+    return jsonify({
+        'status': 'success',
+        'raw_text': ' '.join(detector.detected_sentence),
+        'prediction': detector.stable_char,
     })
 
 
@@ -840,6 +896,7 @@ if __name__ == '__main__':
     logger.info(f"Port: {PORT}")
     logger.info(f"Traffic: {TRAFFIC}")
     logger.info(f"Camera source: {CAMERA_SOURCE}")
+    logger.info(f"Inference mode: {INFERENCE_MODE}")
     logger.info(f"Speak provider: {SPEAK_PROVIDER}")
     logger.info(f"Stability threshold: {STABILITY_THRESHOLD}")
     logger.info(f"Stabilization delay: {STABILIZATION_DELAY}s")

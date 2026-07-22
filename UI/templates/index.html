@@ -151,6 +151,7 @@
                                playsinline
                                muted
                                autoplay></video>
+                        <canvas id="camera-overlay-canvas" class="camera-overlay-canvas"></canvas>
                         <img id="camera-annotated"
                              class="camera-feed camera-annotated"
                              alt="Annotated hand detection"
@@ -337,9 +338,15 @@
     <script>
         window.APP_CONFIG = {
             speakProvider: {{ speak_provider|tojson }},
-            cameraSource: {{ camera_source|tojson }}
+            cameraSource: {{ camera_source|tojson }},
+            inferenceMode: {{ inference_mode|tojson }},
+            stabilityThreshold: {{ stability_threshold|tojson }},
+            stabilityTimeWindow: {{ stability_time_window|tojson }},
+            stabilizationDelay: {{ stabilization_delay|tojson }}
         };
     </script>
+    <script src="{{ url_for('static', filename='js/sign-classifier.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/client-inference.js') }}"></script>
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>
 

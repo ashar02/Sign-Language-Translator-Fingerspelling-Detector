@@ -217,6 +217,10 @@ async function startRecording() {
             elements.recordBtn?.classList.add('recording');
             showRecordingIndicator();
 
+            if (window.ClientInference && getInferenceMode() === 'client') {
+                window.ClientInference.setRecording(true);
+            }
+
             if (elements.predictionBox) {
                 elements.predictionBox.textContent = '—';
             }
@@ -247,8 +251,17 @@ async function stopRecording() {
         setButtonLoading('stop-btn');
         showLoading();
 
+        const payload = {};
+        if (window.ClientInference && getInferenceMode() === 'client') {
+            const state = window.ClientInference.getState();
+            payload.letters = state.letters || [];
+            window.ClientInference.setRecording(false);
+        }
+
         const data = await fetchWithErrorHandling('/stop_recording', {
-            method: 'POST'
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
         });
 
         recording = false;
@@ -696,6 +709,10 @@ function getCameraSource() {
     return (window.APP_CONFIG && window.APP_CONFIG.cameraSource) || 'browser';
 }
 
+function getInferenceMode() {
+    return (window.APP_CONFIG && window.APP_CONFIG.inferenceMode) || 'client';
+}
+
 function setCameraStatus(message, hide = false) {
     const status = document.getElementById('camera-status');
     if (!status) return;
@@ -758,9 +775,21 @@ async function initializeBrowserCamera() {
         });
         video.srcObject = browserStream;
         await video.play();
-        setCameraStatus('', true);
-        startBrowserPredictionLoop();
-        showToast('Camera connected', 'success', 2000);
+
+        if (getInferenceMode() === 'client') {
+            setCameraStatus('Loading on-device model…');
+            await window.ClientInference.init();
+            const overlay = document.getElementById('camera-overlay-canvas');
+            const annotated = document.getElementById('camera-annotated');
+            if (annotated) annotated.hidden = true;
+            window.ClientInference.start(video, overlay, onClientInferenceUpdate);
+            setCameraStatus('', true);
+            showToast('On-device detection ready', 'success', 2000);
+        } else {
+            setCameraStatus('', true);
+            startBrowserPredictionLoop();
+            showToast('Camera connected', 'success', 2000);
+        }
     } catch (error) {
         console.error('Browser camera error:', error);
         const msg = error.name === 'NotAllowedError'
@@ -768,6 +797,23 @@ async function initializeBrowserCamera() {
             : `Could not open camera: ${error.message || error.name}`;
         setCameraStatus(msg);
         showToast(msg, 'error', 6000);
+    }
+}
+
+function onClientInferenceUpdate(data) {
+    applyPredictionUi({
+        prediction: data.prediction,
+        current_prediction: data.currentPrediction,
+        raw_text: data.rawText,
+    });
+
+    if (data.addedCharacter) {
+        // Keep server sentence in sync for stop/speak fallbacks
+        fetch('/append_character', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ character: data.addedCharacter })
+        }).catch(() => {});
     }
 }
 
@@ -834,6 +880,9 @@ async function sendBrowserFrameForPrediction() {
 function refreshVideoFeed() {
     if (getCameraSource() === 'browser') {
         stopBrowserPredictionLoop();
+        if (window.ClientInference) {
+            window.ClientInference.stop();
+        }
         if (browserStream) {
             browserStream.getTracks().forEach(track => track.stop());
             browserStream = null;
@@ -912,6 +961,9 @@ function cleanupVideoFeed() {
         videoFeedCheckInterval = null;
     }
     stopBrowserPredictionLoop();
+    if (window.ClientInference) {
+        window.ClientInference.stop();
+    }
     if (browserStream) {
         browserStream.getTracks().forEach(track => track.stop());
         browserStream = null;
