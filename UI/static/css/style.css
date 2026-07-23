@@ -432,8 +432,8 @@ body {
 
 .hero {
     text-align: center;
-    padding: calc(var(--space-3xl) / 4) var(--space-xl) var(--space-3xl);
-    margin-bottom: var(--space-2xl);
+    padding: calc(var(--space-3xl) / 8) var(--space-xl) calc(var(--space-3xl) / 2);
+    margin-bottom: calc(var(--space-2xl) / 2);
 }
 
 .hero-title {
@@ -1422,7 +1422,8 @@ body:has(.loading-overlay.active) {
     }
 
     .hero {
-        padding: calc(var(--space-2xl) / 4) var(--space-md) var(--space-2xl);
+        padding: calc(var(--space-2xl) / 8) var(--space-md) calc(var(--space-2xl) / 2);
+        margin-bottom: calc(var(--space-xl) / 2);
     }
 
     .hero-title {
