@@ -269,6 +269,10 @@ async function stopRecording() {
         elements.recordBtn?.classList.remove('recording');
         hideRecordingIndicator();
 
+        if (elements.predictionBox) {
+            elements.predictionBox.textContent = '—';
+        }
+
         if (data.status === 'success') {
             const outputBox = elements.outputBox;
 
@@ -290,6 +294,9 @@ async function stopRecording() {
         showToast(error.message || 'Failed to stop recording', 'error');
         recording = false;
         hideRecordingIndicator();
+        if (elements.predictionBox) {
+            elements.predictionBox.textContent = '—';
+        }
     } finally {
         resetButton('stop-btn');
         hideLoading();

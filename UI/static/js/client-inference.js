@@ -137,8 +137,28 @@ const ClientInference = (() => {
         }
     }
 
+    function wrapLine(ctx, text, maxWidth) {
+        if (ctx.measureText(text).width <= maxWidth) return [text];
+
+        const words = text.split('');
+        // Fingerspelling text is often uninterrupted letters; wrap by characters
+        const lines = [];
+        let current = '';
+        for (const ch of words) {
+            const next = current + ch;
+            if (current && ctx.measureText(next).width > maxWidth) {
+                lines.push(current);
+                current = ch;
+            } else {
+                current = next;
+            }
+        }
+        if (current) lines.push(current);
+        return lines.length ? lines : [text];
+    }
+
     function drawHud(ctx, width, height, pred, isStable) {
-        const lines = [
+        const rawLines = [
             `Char: ${stableChar || pred || '-'}`,
             `Text: ${detectedSentence.join('') || '-'}`,
             `Status: ${isStable ? 'Stable' : 'Unstable'}`,
@@ -146,15 +166,28 @@ const ClientInference = (() => {
         const paddingX = 10;
         const paddingY = 8;
         const lineHeight = 22;
+        const maxBarWidth = Math.min(220, Math.floor(width * 0.42));
+        const contentWidth = maxBarWidth - paddingX * 2;
         ctx.font = '600 15px Outfit, sans-serif';
 
-        let textWidth = 0;
-        for (const line of lines) {
-            textWidth = Math.max(textWidth, ctx.measureText(line).width);
+        const displayLines = [];
+        for (const line of rawLines) {
+            const wrapped = wrapLine(ctx, line, contentWidth);
+            for (let i = 0; i < wrapped.length; i++) {
+                displayLines.push({
+                    text: wrapped[i],
+                    isStatus: line.startsWith('Status:'),
+                });
+            }
         }
 
-        const barWidth = Math.ceil(textWidth + paddingX * 2);
-        const barHeight = paddingY * 2 + lineHeight * lines.length;
+        let textWidth = 0;
+        for (const item of displayLines) {
+            textWidth = Math.max(textWidth, ctx.measureText(item.text).width);
+        }
+
+        const barWidth = Math.min(maxBarWidth, Math.ceil(textWidth + paddingX * 2));
+        const barHeight = paddingY * 2 + lineHeight * displayLines.length;
         const barX = width - barWidth - 12;
         const barY = 12;
 
@@ -162,10 +195,10 @@ const ClientInference = (() => {
         ctx.fillRect(barX, barY, barWidth, barHeight);
 
         let y = barY + paddingY + 14;
-        for (const line of lines) {
-            if (line.startsWith('Status:') && !isStable) ctx.fillStyle = '#C62828';
+        for (const item of displayLines) {
+            if (item.isStatus && !isStable) ctx.fillStyle = '#C62828';
             else ctx.fillStyle = '#C2185B';
-            ctx.fillText(line, barX + paddingX, y);
+            ctx.fillText(item.text, barX + paddingX, y);
             y += lineHeight;
         }
     }
