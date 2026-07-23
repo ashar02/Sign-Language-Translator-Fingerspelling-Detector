@@ -217,9 +217,8 @@ async function startRecording() {
             elements.recordBtn?.classList.add('recording');
             showRecordingIndicator();
 
-            if (window.ClientInference && getInferenceMode() === 'client') {
-                window.ClientInference.setRecording(true);
-            }
+            // Inference runs only while recording
+            startInferenceWhileRecording();
 
             if (elements.predictionBox) {
                 elements.predictionBox.textContent = '—';
@@ -255,8 +254,10 @@ async function stopRecording() {
         if (window.ClientInference && getInferenceMode() === 'client') {
             const state = window.ClientInference.getState();
             payload.letters = state.letters || [];
-            window.ClientInference.setRecording(false);
         }
+
+        // Stop inference as soon as recording ends (camera preview stays on)
+        stopInferenceWhileIdle();
 
         const data = await fetchWithErrorHandling('/stop_recording', {
             method: 'POST',
@@ -779,16 +780,13 @@ async function initializeBrowserCamera() {
         if (getInferenceMode() === 'client') {
             setCameraStatus('Loading on-device model…');
             await window.ClientInference.init();
-            const overlay = document.getElementById('camera-overlay-canvas');
             const annotated = document.getElementById('camera-annotated');
             if (annotated) annotated.hidden = true;
-            window.ClientInference.start(video, overlay, onClientInferenceUpdate);
             setCameraStatus('', true);
-            showToast('On-device detection ready', 'success', 2000);
+            showToast('Camera ready — press Record to start detection', 'success', 3000);
         } else {
             setCameraStatus('', true);
-            startBrowserPredictionLoop();
-            showToast('Camera connected', 'success', 2000);
+            showToast('Camera ready — press Record to start detection', 'success', 3000);
         }
     } catch (error) {
         console.error('Browser camera error:', error);
@@ -814,6 +812,49 @@ function onClientInferenceUpdate(data) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ character: data.addedCharacter })
         }).catch(() => {});
+    }
+}
+
+/**
+ * Start detection only while recording is active.
+ */
+function startInferenceWhileRecording() {
+    if (getCameraSource() !== 'browser') return;
+
+    if (getInferenceMode() === 'client' && window.ClientInference) {
+        const video = document.getElementById('camera-video');
+        const overlay = document.getElementById('camera-overlay-canvas');
+        if (!video || !overlay) return;
+        window.ClientInference.setRecording(true);
+        window.ClientInference.start(video, overlay, onClientInferenceUpdate);
+        return;
+    }
+
+    // Server-side frame upload mode
+    startBrowserPredictionLoop();
+}
+
+/**
+ * Stop detection; keep webcam preview running.
+ */
+function stopInferenceWhileIdle() {
+    stopBrowserPredictionLoop();
+
+    if (window.ClientInference) {
+        window.ClientInference.setRecording(false);
+        window.ClientInference.stop();
+    }
+
+    const overlay = document.getElementById('camera-overlay-canvas');
+    if (overlay) {
+        const ctx = overlay.getContext('2d');
+        if (ctx) ctx.clearRect(0, 0, overlay.width, overlay.height);
+    }
+
+    const annotated = document.getElementById('camera-annotated');
+    if (annotated) {
+        annotated.hidden = true;
+        annotated.removeAttribute('src');
     }
 }
 
