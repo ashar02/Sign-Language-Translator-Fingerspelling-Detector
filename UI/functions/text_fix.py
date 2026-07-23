@@ -85,33 +85,41 @@ def _init_client() -> None:
 
 _init_client()
 
-# System prompt for text correction
-SYSTEM_PROMPT = """CRITICAL RULE: Return ONLY the corrected sentence. No explanations, no input/output labels.
-1. Return ONLY the corrected sentence - no explanations, labels, or quotes
-2. NEVER change original words or grammar structures
-3. NEVER add, remove, or modify words
-4. ONLY fix spelling errors and join spaced letters
-5. Add punctuation ONLY when clearly needed
-6. Maintain ALL original word forms exactly as given
-7. Keep exact same sentence structure
-8. Preserve word order exactly as input
-9. Keep formal/informal tone as provided
-10. No semantic or meaning changes
-11. Keep known acronyms exactly as they are (BMW stays BMW)
-12. Add period after single words and acronyms
-13. NEVER convert acronyms to words
-14. Fix common typing errors and misspellings
-15. Add appropriate punctuation
-16. Convert repeated letters only if they're typos (like 'helllo' to 'hello')
-19. Maintain proper sentence case
-20. Handle contractions properly (dont -> don't, cant -> can't)
+# System prompt for text correction (ASL fingerspelling → readable text)
+SYSTEM_PROMPT = """You reconstruct American Sign Language fingerspelling into readable English.
+
+The input is letters detected from hand signs. Letters are often spaced (H E L L O) and may include mistakes: missing letters, extra letters, wrong letters, or repeated letters.
+
+YOUR JOB:
+1. Return ONLY the final corrected sentence. No labels, quotes, or explanation.
+2. Join spaced letters into words (H E L L O → Hello).
+3. Split into words when the letter stream clearly contains multiple words (H E L L O W O R L D → Hello World).
+4. GUESS the closest real English word/phrase when letters are noisy or incomplete. Prefer common everyday words.
+5. Fix typos and near-miss spellings aggressively when intent is clear (H E L O → Hello, T H A M K → Thank, A H I → Ahi only if that fits; prefer real words like "Hi" / "Ah" contextually when short).
+6. Keep known acronyms as acronyms (B M W → BMW, N A S A → NASA).
+7. Use normal sentence case and end with . ! or ? when appropriate.
+8. Do NOT invent long unrelated sentences. Stay close to the signed letters.
+9. Do NOT output the input with spaces still between every letter.
+10. If only a few letters are given, still form the best short word/greeting you can (H I → Hi., O K → OK., Y E S → Yes.).
 
 Examples:
-Input: D O N O T C R Y N O W
-Output: Do Not Cry Now.
+Input: H E L L O
+Output: Hello.
 
-Input: H E L L O W O R L D
-Output: Hello World.
+Input: H E L O
+Output: Hello.
+
+Input: H I
+Output: Hi.
+
+Input: T H A N K Y O U
+Output: Thank You.
+
+Input: T H A M K Y O U
+Output: Thank You.
+
+Input: G O O D M O R N I N G
+Output: Good Morning.
 
 Input: W H E R E A R E Y O U
 Output: Where Are You?
@@ -121,7 +129,23 @@ Output: BMW.
 
 Input: I W O R K A T I B M
 Output: I Work At IBM.
+
+Input: H E L L L O W O R L D D
+Output: Hello World.
+
+Input: P L E A S N E H E L P
+Output: Please Help.
 """
+
+
+def _compact_original(input_text: str) -> str:
+    """Join spaced fingerspelled letters into a compact original token string."""
+    parts = [p for p in input_text.strip().split() if p]
+    if not parts:
+        return ""
+    if all(len(p) == 1 for p in parts):
+        return "".join(parts).upper()
+    return " ".join(parts)
 
 
 def _basic_format(input_text: str) -> str:
@@ -142,21 +166,34 @@ def _basic_format(input_text: str) -> str:
     return formatted
 
 
+def _with_original(input_text: str, guessed: str) -> str:
+    """Show compact original letters and guessed text: ORIGINAL / Guessed."""
+    original = _compact_original(input_text)
+    guessed = (guessed or "").strip()
+    if not guessed:
+        guessed = _basic_format(input_text)
+    if not original:
+        return guessed
+    # Avoid "HELLO / Hello." duplication noise when identical ignoring punctuation/case
+    guess_cmp = guessed.rstrip(".!?").replace(" ", "").upper()
+    orig_cmp = original.replace(" ", "").upper()
+    if guess_cmp == orig_cmp:
+        return guessed
+    return f"{original} / {guessed}"
+
+
 def generate_sentences(input_text: str) -> str:
     """Generate corrected sentences from spaced letter input.
 
-    Args:
-        input_text: Raw text with spaced letters from ASL recognition.
-
     Returns:
-        Corrected and formatted sentence.
+        String like \"HELO / Hello.\" (original letters / guessed sentence).
     """
     if not input_text or not input_text.strip():
         return ""
 
     if not API_AVAILABLE or client is None:
         logger.warning("Correction API not available, returning basic formatting")
-        return _basic_format(input_text)
+        return _with_original(input_text, _basic_format(input_text))
 
     try:
         logger.info(f"Processing text via {ACTIVE_PROVIDER}/{ACTIVE_MODEL}: {input_text[:50]}...")
@@ -173,8 +210,12 @@ def generate_sentences(input_text: str) -> str:
 
         result = response.choices[0].message.content if response.choices else None
         cleaned = (result or "").strip().strip('"').strip("'")
+        # If model already returned "A / B", keep only the guess part after last " / "
+        if " / " in cleaned:
+            cleaned = cleaned.split(" / ")[-1].strip()
         logger.info(f"Generated result: {cleaned}")
-        return cleaned if cleaned else _basic_format(input_text)
+        guessed = cleaned if cleaned else _basic_format(input_text)
+        return _with_original(input_text, guessed)
 
     except Exception as e:
         error_msg = str(e)
@@ -185,7 +226,7 @@ def generate_sentences(input_text: str) -> str:
         elif "429" in error_msg or "rate_limit" in error_msg.lower():
             logger.error(f"{ACTIVE_PROVIDER} rate limit exceeded. Try again later.")
 
-        return _basic_format(input_text)
+        return _with_original(input_text, _basic_format(input_text))
 
 
 if __name__ == "__main__":
