@@ -16,7 +16,11 @@ services:
       - FLASK_ENV=development
       - FLASK_DEBUG=1
       # API Keys - Set these in your .env file or environment
+      - CORRECTION_PROVIDER=${CORRECTION_PROVIDER:-groq}
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - GROQ_MODEL=${GROQ_MODEL:-llama-3.1-8b-instant}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o-mini}
       - ELEVENLABS_API_KEY=${ELEVENLABS_API_KEY}
       - ELEVENLABS_VOICE_ID=${ELEVENLABS_VOICE_ID}
       # Server / traffic

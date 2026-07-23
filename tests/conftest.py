@@ -16,6 +16,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'UI'))
 def app():
     """Create and configure a test application instance."""
     # Set environment variables for testing
+    os.environ.setdefault('CORRECTION_PROVIDER', 'none')
+    os.environ.setdefault('GROQ_API_KEY', 'test-key')
     os.environ.setdefault('OPENAI_API_KEY', 'test-key')
     os.environ.setdefault('ELEVENLABS_API_KEY', 'test-key')
     os.environ.setdefault('ELEVENLABS_VOICE_ID', 'test-voice-id')
