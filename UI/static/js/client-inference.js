@@ -118,17 +118,21 @@ const ClientInference = (() => {
         ctx.strokeStyle = '#00FF7F';
         ctx.fillStyle = '#FF1493';
 
+        // Mirror X to match CSS-mirrored video; keep text unmirrored on this canvas
+        const mx = (p) => (1 - p.x) * width;
+        const my = (p) => p.y * height;
+
         for (const [a, b] of HAND_CONNECTIONS) {
             const pa = landmarks[a];
             const pb = landmarks[b];
             ctx.beginPath();
-            ctx.moveTo(pa.x * width, pa.y * height);
-            ctx.lineTo(pb.x * width, pb.y * height);
+            ctx.moveTo(mx(pa), my(pa));
+            ctx.lineTo(mx(pb), my(pb));
             ctx.stroke();
         }
         for (const p of landmarks) {
             ctx.beginPath();
-            ctx.arc(p.x * width, p.y * height, 4, 0, Math.PI * 2);
+            ctx.arc(mx(p), my(p), 4, 0, Math.PI * 2);
             ctx.fill();
         }
     }
