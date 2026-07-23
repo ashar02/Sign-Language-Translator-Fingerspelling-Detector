@@ -1249,7 +1249,7 @@ body {
 
 .toast {
     position: fixed;
-    top: 100px;
+    top: var(--space-md);
     right: var(--space-xl);
     min-width: 320px;
     max-width: 450px;
