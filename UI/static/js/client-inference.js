@@ -62,12 +62,16 @@ const ClientInference = (() => {
     function setRecording(value) {
         isRecording = !!value;
         if (isRecording) {
-            detectedSentence = [];
-            stabilityBuffer.length = 0;
-            lastConfirmedChar = '';
-            lastDetectionTime = 0;
-            stableChar = '';
+            clearSentence();
         }
+    }
+
+    function clearSentence() {
+        detectedSentence = [];
+        stabilityBuffer.length = 0;
+        lastConfirmedChar = '';
+        lastDetectionTime = 0;
+        stableChar = '';
     }
 
     function getState() {
@@ -268,7 +272,7 @@ const ClientInference = (() => {
         }
     }
 
-    return { init, start, stop, setRecording, getState };
+    return { init, start, stop, setRecording, clearSentence, getState };
 })();
 
 window.ClientInference = ClientInference;

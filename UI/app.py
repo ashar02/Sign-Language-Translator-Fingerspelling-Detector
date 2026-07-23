@@ -302,7 +302,17 @@ class SignLanguageDetector:
         self.stability_buffer = []
         self.last_confirmed_char = ""
         self.stable_char = ""
+        self.current_meaningful_sentence = ""
         logger.info("Recording started")
+
+    def clear_translated_text(self) -> None:
+        """Clear accumulated letters and translated output without changing recording mode."""
+        self.detected_sentence = []
+        self.stability_buffer = []
+        self.last_confirmed_char = ""
+        self.stable_char = ""
+        self.current_meaningful_sentence = ""
+        logger.info("Translated text cleared")
 
     def stop_recording(self) -> tuple[str, str]:
         """Stop recording and generate meaningful sentence.
@@ -676,6 +686,13 @@ def start_recording():
     """Start recording sign language gestures."""
     detector.start_recording()
     return jsonify({'status': 'success', 'message': 'Recording started'})
+
+
+@app.route('/clear_translated_text', methods=['POST'])
+def clear_translated_text():
+    """Clear translated text and letter buffer."""
+    detector.clear_translated_text()
+    return jsonify({'status': 'success', 'message': 'Translated text cleared'})
 
 
 @app.route('/stop_recording', methods=['POST'])

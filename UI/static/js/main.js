@@ -359,6 +359,42 @@ function getSpeakableText(text) {
 }
 
 /**
+ * Clear translated text (UI + client/server letter buffers).
+ */
+async function clearTranslatedText() {
+    const outputBox = elements.outputBox;
+    const placeholder = 'Your translated text will appear here...';
+    const current = outputBox?.textContent?.trim() || '';
+
+    if (
+        !current ||
+        current === placeholder ||
+        current === 'Listening for signs...'
+    ) {
+        showToast('Nothing to clear.', 'info');
+        return;
+    }
+
+    if (outputBox) {
+        outputBox.textContent = recording ? 'Listening for signs...' : placeholder;
+    }
+    if (elements.predictionBox) {
+        elements.predictionBox.textContent = '—';
+    }
+    if (window.ClientInference && typeof window.ClientInference.clearSentence === 'function') {
+        window.ClientInference.clearSentence();
+    }
+
+    try {
+        await fetch('/clear_translated_text', { method: 'POST' });
+        showToast('Translated text cleared', 'success', 2000);
+    } catch (error) {
+        console.warn('Could not clear server text state:', error);
+        showToast('Translated text cleared', 'success', 2000);
+    }
+}
+
+/**
  * Speak translated text aloud.
  * Default: free browser Web Speech API (Google voices in Chrome).
  * Optional: ElevenLabs when SPEAK_PROVIDER=elevenlabs.
@@ -1090,6 +1126,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 window.startRecording = startRecording;
 window.stopRecording = stopRecording;
+window.clearTranslatedText = clearTranslatedText;
 window.speakText = speakText;
 window.convertText = convertText;
 window.convertSpeech = convertSpeech;

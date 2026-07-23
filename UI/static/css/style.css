@@ -1111,12 +1111,21 @@ body {
     max-height: 80px;
     overflow-y: auto;
     color: var(--color-ink-light);
+    padding-right: 9.5rem;
 }
 
-.btn-speak {
+.result-actions {
     position: absolute;
     bottom: var(--space-md);
     right: var(--space-md);
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+}
+
+.btn-speak,
+.btn-clear-text {
+    position: static;
 }
 
 /* =============================================================================
