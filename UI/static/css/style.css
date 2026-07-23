@@ -791,12 +791,12 @@ body {
     border-radius: var(--radius-full);
     color: white;
     cursor: pointer;
-    opacity: 0;
+    opacity: 1;
     transition: all var(--duration-normal) var(--ease-out);
 }
 
 .camera-frame:hover .camera-refresh-btn {
-    opacity: 0.7;
+    opacity: 1;
 }
 
 .camera-refresh-btn:hover {

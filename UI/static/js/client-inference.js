@@ -143,23 +143,29 @@ const ClientInference = (() => {
             `Text: ${detectedSentence.join('') || '-'}`,
             `Status: ${isStable ? 'Stable' : 'Unstable'}`,
         ];
-        const paddingX = 16;
-        const paddingY = 12;
-        const lineHeight = 26;
-        const barHeight = paddingY * 2 + lineHeight * lines.length;
-        const barWidth = Math.min(280, width - paddingX * 2);
-        // Top-right (refresh + recording sit on the left)
-        const barX = width - barWidth - paddingX;
-        const barY = paddingY;
+        const paddingX = 10;
+        const paddingY = 8;
+        const lineHeight = 22;
+        ctx.font = '600 15px Outfit, sans-serif';
 
-        ctx.fillStyle = 'rgba(0,0,0,0.5)';
-        ctx.fillRect(barX, barY, barWidth, barHeight);
-        ctx.font = '600 16px Outfit, sans-serif';
-        let y = barY + paddingY + 16;
+        let textWidth = 0;
         for (const line of lines) {
-            if (line.startsWith('Status:') && !isStable) ctx.fillStyle = '#FF3333';
-            else ctx.fillStyle = '#FF00FF';
-            ctx.fillText(line, barX + 12, y, barWidth - 24);
+            textWidth = Math.max(textWidth, ctx.measureText(line).width);
+        }
+
+        const barWidth = Math.ceil(textWidth + paddingX * 2);
+        const barHeight = paddingY * 2 + lineHeight * lines.length;
+        const barX = width - barWidth - 12;
+        const barY = 12;
+
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.72)';
+        ctx.fillRect(barX, barY, barWidth, barHeight);
+
+        let y = barY + paddingY + 14;
+        for (const line of lines) {
+            if (line.startsWith('Status:') && !isStable) ctx.fillStyle = '#C62828';
+            else ctx.fillStyle = '#C2185B';
+            ctx.fillText(line, barX + paddingX, y);
             y += lineHeight;
         }
     }
