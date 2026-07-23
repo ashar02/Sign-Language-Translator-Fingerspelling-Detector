@@ -143,16 +143,24 @@ const ClientInference = (() => {
             `Text: ${detectedSentence.join('') || '-'}`,
             `Status: ${isStable ? 'Stable' : 'Unstable'}`,
         ];
-        ctx.fillStyle = 'rgba(0,0,0,0.45)';
-        ctx.fillRect(0, 0, width, 96);
-        ctx.font = '600 18px Outfit, sans-serif';
-        ctx.fillStyle = '#FF00FF';
-        let y = 28;
+        const paddingX = 16;
+        const paddingY = 12;
+        const lineHeight = 26;
+        const barHeight = paddingY * 2 + lineHeight * lines.length;
+        const barWidth = Math.min(280, width - paddingX * 2);
+        // Top-right (refresh + recording sit on the left)
+        const barX = width - barWidth - paddingX;
+        const barY = paddingY;
+
+        ctx.fillStyle = 'rgba(0,0,0,0.5)';
+        ctx.fillRect(barX, barY, barWidth, barHeight);
+        ctx.font = '600 16px Outfit, sans-serif';
+        let y = barY + paddingY + 16;
         for (const line of lines) {
             if (line.startsWith('Status:') && !isStable) ctx.fillStyle = '#FF3333';
             else ctx.fillStyle = '#FF00FF';
-            ctx.fillText(line, 80, y);
-            y += 28;
+            ctx.fillText(line, barX + 12, y, barWidth - 24);
+            y += lineHeight;
         }
     }
 

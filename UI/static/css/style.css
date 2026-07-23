@@ -736,7 +736,8 @@ body {
 .recording-indicator {
     position: absolute;
     top: var(--space-md);
-    left: var(--space-md);
+    left: calc(var(--space-md) + 40px);
+    z-index: 3;
     display: flex;
     align-items: center;
     gap: var(--space-sm);
@@ -778,7 +779,9 @@ body {
 .camera-refresh-btn {
     position: absolute;
     top: var(--space-md);
-    right: var(--space-md);
+    left: var(--space-md);
+    right: auto;
+    z-index: 3;
     width: 32px;
     height: 32px;
     padding: 6px;
