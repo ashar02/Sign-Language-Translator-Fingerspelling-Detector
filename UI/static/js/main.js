@@ -346,16 +346,36 @@ function applyPredictionUi(data) {
 setInterval(updatePrediction, 400);
 
 /**
+ * From "HELO / Hello." return only the guessed part for speech.
+ * While recording / letter-only text, returns the text as-is.
+ */
+function getSpeakableText(text) {
+    const value = (text || '').trim();
+    if (!value) return '';
+    if (value.includes(' / ')) {
+        return value.split(' / ').slice(1).join(' / ').trim();
+    }
+    return value;
+}
+
+/**
  * Speak translated text aloud.
  * Default: free browser Web Speech API (Google voices in Chrome).
  * Optional: ElevenLabs when SPEAK_PROVIDER=elevenlabs.
+ * Speaks only the guessed phrase after "ORIGINAL / Guess".
  */
 async function speakText() {
     const outputBox = elements.outputBox;
-    const text = outputBox?.textContent?.trim();
+    const fullText = outputBox?.textContent?.trim();
+    const text = getSpeakableText(fullText);
 
-    if (!text || text === 'Your translated text will appear here...' || text === 'No signs detected. Try again.') {
+    if (!fullText || fullText === 'Your translated text will appear here...' || fullText === 'No signs detected. Try again.' || fullText === 'Listening for signs...') {
         showToast('No text to speak. Record some signs first.', 'info');
+        return;
+    }
+
+    if (!text) {
+        showToast('No guessed word to speak yet.', 'info');
         return;
     }
 

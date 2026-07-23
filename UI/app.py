@@ -741,6 +741,10 @@ def speak_text():
         if not text:
             text = (detector.current_meaningful_sentence or '').strip()
 
+        # Speak only the guessed phrase from "ORIGINAL / Guess"
+        if ' / ' in text:
+            text = text.split(' / ', 1)[1].strip()
+
         if not text:
             return jsonify({
                 'status': 'error',
