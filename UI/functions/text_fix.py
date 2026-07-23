@@ -167,17 +167,12 @@ def _basic_format(input_text: str) -> str:
 
 
 def _with_original(input_text: str, guessed: str) -> str:
-    """Show compact original letters and guessed text: ORIGINAL / Guessed."""
+    """Always show compact original letters and guessed text: ORIGINAL / Guessed."""
     original = _compact_original(input_text)
     guessed = (guessed or "").strip()
     if not guessed:
         guessed = _basic_format(input_text)
     if not original:
-        return guessed
-    # Avoid "HELLO / Hello." duplication noise when identical ignoring punctuation/case
-    guess_cmp = guessed.rstrip(".!?").replace(" ", "").upper()
-    orig_cmp = original.replace(" ", "").upper()
-    if guess_cmp == orig_cmp:
         return guessed
     return f"{original} / {guessed}"
 
