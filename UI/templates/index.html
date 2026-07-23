@@ -353,7 +353,8 @@
             inferenceMode: {{ inference_mode|tojson }},
             stabilityThreshold: {{ stability_threshold|tojson }},
             stabilityTimeWindow: {{ stability_time_window|tojson }},
-            stabilizationDelay: {{ stabilization_delay|tojson }}
+            stabilizationDelay: {{ stabilization_delay|tojson }},
+            handAwayResetSeconds: {{ hand_away_reset_seconds|tojson }}
         };
     </script>
     <script src="{{ url_for('static', filename='js/sign-classifier.js') }}"></script>

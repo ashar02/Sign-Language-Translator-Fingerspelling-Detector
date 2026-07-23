@@ -14,6 +14,7 @@ const ClientInference = (() => {
     let stableChar = '';
     let detectedSentence = [];
     let isRecording = false;
+    let lastHandSeenAt = 0;
 
     const HAND_CONNECTIONS = [
         [0, 1], [1, 2], [2, 3], [3, 4],
@@ -30,6 +31,7 @@ const ClientInference = (() => {
             stabilityThreshold: cfg.stabilityThreshold || 5,
             stabilityTimeWindow: cfg.stabilityTimeWindow || 1.0,
             stabilizationDelay: cfg.stabilizationDelay || 2.0,
+            handAwayResetSeconds: cfg.handAwayResetSeconds || 0.35,
         };
     }
 
@@ -72,6 +74,33 @@ const ClientInference = (() => {
         lastConfirmedChar = '';
         lastDetectionTime = 0;
         stableChar = '';
+        lastHandSeenAt = 0;
+    }
+
+    function clearLetterLock() {
+        // Unlock same-letter repeats after the hand briefly leaves the frame
+        lastConfirmedChar = '';
+        lastDetectionTime = 0;
+        stabilityBuffer.length = 0;
+        stableChar = '';
+    }
+
+    function updateHandPresence(present) {
+        const now = performance.now() / 1000;
+        const { handAwayResetSeconds } = config();
+        if (present) {
+            lastHandSeenAt = now;
+            return;
+        }
+        if (lastHandSeenAt <= 0) {
+            return;
+        }
+        if (now - lastHandSeenAt >= handAwayResetSeconds) {
+            if (lastConfirmedChar || stabilityBuffer.length || stableChar) {
+                clearLetterLock();
+            }
+            lastHandSeenAt = 0;
+        }
     }
 
     function getState() {
@@ -161,11 +190,14 @@ const ClientInference = (() => {
         return lines.length ? lines : [text];
     }
 
-    function drawHud(ctx, width, height, pred, isStable) {
+    function drawHud(ctx, width, height, pred, isStable, handDetected) {
+        const statusText = !handDetected && isRecording
+            ? 'Status: Hand away — re-show letter'
+            : `Status: ${isStable ? 'Stable' : 'Unstable'}`;
         const rawLines = [
             `Char: ${stableChar || pred || '-'}`,
             `Text: ${detectedSentence.join('') || '-'}`,
-            `Status: ${isStable ? 'Stable' : 'Unstable'}`,
+            statusText,
         ];
         const paddingX = 10;
         const paddingY = 8;
@@ -231,8 +263,10 @@ const ClientInference = (() => {
             let prediction = '';
             let added = false;
             let isStable = false;
+            const handDetected = !!(result.landmarks && result.landmarks.length);
 
-            if (result.landmarks && result.landmarks.length > 0) {
+            if (handDetected) {
+                updateHandPresence(true);
                 const landmarks = result.landmarks[0];
                 drawLandmarks(ctx, landmarks, width, height);
                 const pred = window.SignClassifier.predictFromLandmarks(landmarks);
@@ -243,10 +277,11 @@ const ClientInference = (() => {
                     added = processStable(stable);
                 }
             } else {
+                updateHandPresence(false);
                 ctx.clearRect(0, 0, width, height);
             }
 
-            drawHud(ctx, width, height, prediction, isStable);
+            drawHud(ctx, width, height, prediction, isStable, handDetected);
 
             if (typeof onUpdate === 'function') {
                 onUpdate({
@@ -256,7 +291,7 @@ const ClientInference = (() => {
                     letters: [...detectedSentence],
                     addedCharacter: added ? lastConfirmedChar : null,
                     isStable,
-                    handDetected: !!(result.landmarks && result.landmarks.length),
+                    handDetected,
                 });
             }
         };

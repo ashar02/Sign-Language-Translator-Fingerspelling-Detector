@@ -45,6 +45,8 @@ FEATURE_VECTOR_SIZE: int = 42  # 21 landmarks * 2 coordinates (x, y)
 STABILITY_THRESHOLD: int = int(os.getenv('STABILITY_THRESHOLD', '5'))
 STABILITY_TIME_WINDOW: float = float(os.getenv('STABILITY_TIME_WINDOW', '1.0'))
 STABILIZATION_DELAY: float = float(os.getenv('STABILIZATION_DELAY', '2.0'))
+# Brief hand absence that unlocks repeating the same letter (HELLO, BOOK, …)
+HAND_AWAY_RESET_SECONDS: float = float(os.getenv('HAND_AWAY_RESET_SECONDS', '0.35'))
 
 # Input validation
 MAX_TEXT_LENGTH: int = 500
@@ -235,6 +237,7 @@ def process_detection_frame(frame: np.ndarray) -> tuple[np.ndarray, dict]:
     confidence = 0.0
 
     if results.multi_hand_landmarks:
+        detector.update_hand_presence(True)
         for hand_landmarks in results.multi_hand_landmarks:
             mp.solutions.drawing_utils.draw_landmarks(
                 frame, hand_landmarks, mp_hands.HAND_CONNECTIONS
@@ -246,6 +249,8 @@ def process_detection_frame(frame: np.ndarray) -> tuple[np.ndarray, dict]:
                 if is_stable and stable_pred:
                     detector.process_stable_prediction(stable_pred)
             break
+    else:
+        detector.update_hand_presence(False)
 
     is_buffer_stable = len(detector.stability_buffer) >= STABILITY_THRESHOLD
     if predicted_char or detector.stable_char or detector.detected_sentence:
@@ -290,10 +295,11 @@ class SignLanguageDetector:
         self.detected_sentence: list[str] = []
         self.is_recording: bool = False
         self.last_confirmed_char: str = ""
-        self.last_detection_time: float = time.time()
+        self.last_detection_time: float = 0.0
         self.stable_char: str = ""
         self.current_meaningful_sentence: str = ""
         self.stability_buffer: list[tuple[str, float]] = []
+        self._last_hand_seen: float = 0.0
 
     def start_recording(self) -> None:
         """Start recording mode and reset sentence."""
@@ -301,6 +307,7 @@ class SignLanguageDetector:
         self.detected_sentence = []
         self.stability_buffer = []
         self.last_confirmed_char = ""
+        self.last_detection_time = 0.0
         self.stable_char = ""
         self.current_meaningful_sentence = ""
         logger.info("Recording started")
@@ -310,9 +317,33 @@ class SignLanguageDetector:
         self.detected_sentence = []
         self.stability_buffer = []
         self.last_confirmed_char = ""
+        self.last_detection_time = 0.0
         self.stable_char = ""
         self.current_meaningful_sentence = ""
         logger.info("Translated text cleared")
+
+    def _clear_letter_lock(self) -> None:
+        """Allow the same alphabet to be added again after hand leaves the frame."""
+        if self.last_confirmed_char or self.stability_buffer or self.stable_char:
+            logger.debug(
+                f"Hand away — letter lock cleared (was {self.last_confirmed_char!r})"
+            )
+        self.last_confirmed_char = ""
+        self.last_detection_time = 0.0
+        self.stability_buffer = []
+        self.stable_char = ""
+
+    def update_hand_presence(self, present: bool) -> None:
+        """Track hand visibility; brief absence unlocks repeating the same letter."""
+        now = time.time()
+        if present:
+            self._last_hand_seen = now
+            return
+        if self._last_hand_seen <= 0:
+            return
+        if now - self._last_hand_seen >= HAND_AWAY_RESET_SECONDS:
+            self._clear_letter_lock()
+            self._last_hand_seen = 0.0
 
     def stop_recording(self) -> tuple[str, str]:
         """Stop recording and generate meaningful sentence.
@@ -373,7 +404,8 @@ class SignLanguageDetector:
         current_time = time.time()
         self.stable_char = prediction
 
-        # Add to sentence if recording and enough time has passed
+        # Add to sentence if recording and enough time has passed.
+        # Same letter is allowed again after hand-away clears last_confirmed_char.
         if (self.is_recording and
             prediction != self.last_confirmed_char and
             current_time - self.last_detection_time >= STABILIZATION_DELAY):
@@ -385,18 +417,20 @@ class SignLanguageDetector:
 
 
     def append_confirmed_character(self, prediction: str) -> None:
-        """Append a client-confirmed character while recording."""
+        """Append a client-confirmed character while recording.
+
+        Client already enforced stability + hand-away rules, so always append.
+        """
         if not self.is_recording or not prediction:
             return
         char = prediction.strip().upper()
         if len(char) != 1 or not char.isalpha():
             return
         self.stable_char = char
-        if char != self.last_confirmed_char:
-            self.detected_sentence.append(char)
-            self.last_confirmed_char = char
-            self.last_detection_time = time.time()
-            logger.debug(f"Client appended character: {char}, Sentence: {self.detected_sentence}")
+        self.detected_sentence.append(char)
+        self.last_confirmed_char = char
+        self.last_detection_time = time.time()
+        logger.debug(f"Client appended character: {char}, Sentence: {self.detected_sentence}")
 
     def replace_detected_sentence(self, letters: list[str]) -> None:
         """Replace detected sentence from client-side inference letters."""
@@ -620,6 +654,7 @@ def index():
         stability_threshold=STABILITY_THRESHOLD,
         stability_time_window=STABILITY_TIME_WINDOW,
         stabilization_delay=STABILIZATION_DELAY,
+        hand_away_reset_seconds=HAND_AWAY_RESET_SECONDS,
     )
 
 
@@ -921,6 +956,7 @@ if __name__ == '__main__':
     logger.info(f"Speak provider: {SPEAK_PROVIDER}")
     logger.info(f"Stability threshold: {STABILITY_THRESHOLD}")
     logger.info(f"Stabilization delay: {STABILIZATION_DELAY}s")
+    logger.info(f"Hand-away reset: {HAND_AWAY_RESET_SECONDS}s")
 
     ssl_context = get_ssl_context()
     if ssl_context:

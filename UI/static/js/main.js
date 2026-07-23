@@ -211,7 +211,7 @@ async function startRecording() {
 
         if (data.status === 'success') {
             recording = true;
-            showToast('Recording started! Show your signs to the camera.', 'success', 3000);
+            showToast('Recording started! For double letters (LL), briefly move your hand away, then sign again.', 'success', 4500);
 
             // Update UI to show recording state
             elements.recordBtn?.classList.add('recording');
